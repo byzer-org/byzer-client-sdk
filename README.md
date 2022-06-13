@@ -1,6 +1,8 @@
 # byzer-client-sdk
 
-byzer-client-sdk is a byzer-lang builder tool which help people to create byzer code.
+byzer-client-sdk is a byzer-lang builder which help people to create and execute byzer code.
+
+## Example
 
 ```scala
 val genCode = Byzer().load.format("csv").path("/tmp/jack").
@@ -15,7 +17,9 @@ the output is :
 load csv.`/tmp/jack` where `header`='''true''' as 004f7b1361904755a223a543c613a387;
 ```
 
-## namedTableName
+## Tutorial
+
+### namedTableName
 
 You can specify every output table name otherwize the system will autogenerate a name.
 
@@ -53,11 +57,11 @@ test("tag") {
   }
 ```
 
-## Execute Byzer Script
+## Create and Execute Byzer Script
 
 You can setup Byzer engine url and then build byzer script to run.
 
-```
+```scala
 test("engine") {
     val byzer = Byzer().cluster().
       engine.url("http://127.0.0.1:9004/run/script").owner("admin").end.
