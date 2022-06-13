@@ -1,7 +1,7 @@
 package tech.mlsql.test.byzer_client_sdk.scala_lang.generator
 
 import org.scalatest.funsuite.AnyFunSuite
-import tech.mlsql.byzer_client_sdk.scala_lang.generator.{And, Byzer, Expr, LangScalaType, UDFUDFType}
+import tech.mlsql.byzer_client_sdk.scala_lang.generator._
 
 /**
  * 10/6/2022 WilliamZhu(allwefantasy@gmail.com)
@@ -136,7 +136,7 @@ class ByzerScriptTest extends AnyFunSuite {
    * where lang="scala"
    * and code='''
    * def apply(a:Seq[String])={
-   *       a.last
+   * a.last
    * }
    * '''
    * and udfType="udf";
@@ -152,24 +152,24 @@ class ByzerScriptTest extends AnyFunSuite {
     println(genCode)
   }
 
-/**
-  !python conf "schema=st(field(content,string),field(mime,string))";
- !python env "PYTHON_ENV=source /opt/miniconda3/bin/activate ray1.8.0";
-
-
-run command as Ray.`` where
-inputTable="day_pv_uv" and
-outputTable="3ebc4659a63244dd802243a779d9a3e7_0" and
-
-
-code='''#%python
-#%input=day_pv_uv
-#%schema=st(field(content,string),field(mime,string))
-#%env=source /opt/miniconda3/bin/activate ray1.8.0
-
-from pyjava.api.mlsql import RayContext,PythonContext
-''';
-select * from 3ebc4659a63244dd802243a779d9a3e7_0 as 3ebc4659a63244dd802243a779d9a3e7;
+  /**
+   * !python conf "schema=st(field(content,string),field(mime,string))";
+   * !python env "PYTHON_ENV=source /opt/miniconda3/bin/activate ray1.8.0";
+   *
+   *
+   * run command as Ray.`` where
+   * inputTable="day_pv_uv" and
+   * outputTable="3ebc4659a63244dd802243a779d9a3e7_0" and
+   *
+   *
+   * code='''#%python
+   * #%input=day_pv_uv
+   * #%schema=st(field(content,string),field(mime,string))
+   * #%env=source /opt/miniconda3/bin/activate ray1.8.0
+   *
+   * from pyjava.api.mlsql import RayContext,PythonContext
+   * ''';
+   * select * from 3ebc4659a63244dd802243a779d9a3e7_0 as 3ebc4659a63244dd802243a779d9a3e7;
    */
   test("python") {
     val genCode = Byzer().python.codeWithHint(
@@ -185,29 +185,29 @@ select * from 3ebc4659a63244dd802243a779d9a3e7_0 as 3ebc4659a63244dd802243a779d9
 
   /**
    * !python conf "schema=st(field(content,string),field(mime,string))";
- !python env "PYTHON_ENV=source /opt/miniconda3/bin/activate ray1.8.0";
- !python conf "dataMode=model";
- !python conf "runIn=driver";
-run command as Ray.`` where
-inputTable="day_pv_uv" and
-outputTable="9f5ca0e7d85a4986907213a1c33cbb73_0" and
-
-
-code='''#%python
-#%input=day_pv_uv
-#%output=9f5ca0e7d85a4986907213a1c33cbb73
-#%cache=true
-
-
-#%schema=st(field(content,string),field(mime,string))
-#%env=source /opt/miniconda3/bin/activate ray1.8.0
-#%dataMode=model
-#%runIn=driver
-from pyjava.api.mlsql import RayContext,PythonContext
-''';
-
-save overwrite 9f5ca0e7d85a4986907213a1c33cbb73_0 as parquet.`/tmp/__python__/9f5ca0e7d85a4986907213a1c33cbb73`;
-load parquet.`/tmp/__python__/9f5ca0e7d85a4986907213a1c33cbb73` as 9f5ca0e7d85a4986907213a1c33cbb73;
+   * !python env "PYTHON_ENV=source /opt/miniconda3/bin/activate ray1.8.0";
+   * !python conf "dataMode=model";
+   * !python conf "runIn=driver";
+   * run command as Ray.`` where
+   * inputTable="day_pv_uv" and
+   * outputTable="9f5ca0e7d85a4986907213a1c33cbb73_0" and
+   *
+   *
+   * code='''#%python
+   * #%input=day_pv_uv
+   * #%output=9f5ca0e7d85a4986907213a1c33cbb73
+   * #%cache=true
+   *
+   *
+   * #%schema=st(field(content,string),field(mime,string))
+   * #%env=source /opt/miniconda3/bin/activate ray1.8.0
+   * #%dataMode=model
+   * #%runIn=driver
+   * from pyjava.api.mlsql import RayContext,PythonContext
+   * ''';
+   *
+   * save overwrite 9f5ca0e7d85a4986907213a1c33cbb73_0 as parquet.`/tmp/__python__/9f5ca0e7d85a4986907213a1c33cbb73`;
+   * load parquet.`/tmp/__python__/9f5ca0e7d85a4986907213a1c33cbb73` as 9f5ca0e7d85a4986907213a1c33cbb73;
    */
   test("python2") {
     val genCode = Byzer().python.
@@ -216,6 +216,17 @@ load parquet.`/tmp/__python__/9f5ca0e7d85a4986907213a1c33cbb73` as 9f5ca0e7d85a4
       env("source /opt/miniconda3/bin/activate ray1.8.0").
       code("from pyjava.api.mlsql import RayContext,PythonContext").end.toScript
     println(genCode)
+  }
+
+  test("tag") {
+    val byzer = Byzer()
+    val table1 = byzer.load.format("csv").path("/tmp/jack").options().add("header", "true").end.tag("t1")
+    val table2 = byzer.load.format("csv").path("/tmp/william").options().add("header", "true").end.tag("t2")
+    table1.end
+    table2.end
+
+    val t1 = byzer.getByTag("t1")
+    println(t1.head.tableName)
   }
 
 }

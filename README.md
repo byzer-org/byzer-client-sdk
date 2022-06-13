@@ -15,6 +15,44 @@ the output is :
 load csv.`/tmp/jack` where `header`='''true''' as 004f7b1361904755a223a543c613a387;
 ```
 
+## namedTableName
+
+You can specify every output table name otherwize the system will autogenerate a name.
+
+```scala
+/**
+   * load csv.`/tmp/jack` where `header`='''true''' as table1;
+   * select * from table1 where (a=b or (c>2 and d>10)) as 271a2df28abb469da3ee87566873fdbd;
+   * select split('a',',')[0] as a2 from 271a2df28abb469da3ee87566873fdbd as a3ab7cc1682f4f11935cbfa3281bf454;
+   */
+  test("project with specific table name") {
+    val genCode = Byzer().
+      load.format("csv").path("/tmp/jack").options().add("header", "true").end.namedTableName("table1").end.
+      filter.from("table1").or.add(Expr(Some("a=b"))).add(And(Expr(Some("c>2")), Expr(Some("d>10")))).end.end.
+      columns.addColumn(Expr(Some("split('a',',')[0] as a2"))).end.
+      toScript
+
+    println(genCode)
+  }
+```
+
+## Tag
+
+Tag help you get every block
+
+```scala
+test("tag") {
+    val byzer = Byzer()
+    val table1 = byzer.load.format("csv").path("/tmp/jack").options().add("header", "true").end.tag("t1")
+    val table2 = byzer.load.format("csv").path("/tmp/william").options().add("header", "true").end.tag("t2")
+    table1.end
+    table2.end
+
+    val t1 = byzer.getByTag("t1")    
+    println(t1.head.tableName)
+  }
+```
+
 ## Scala 
 
 Some examples:
@@ -27,6 +65,21 @@ Some examples:
     val genCode = Byzer().load.format("csv").path("/tmp/jack").
       options().add("header", "true").end.
       end.toScript
+    println(genCode)
+  }
+
+  /**
+   * load csv.`/tmp/jack` where `header`='''true''' as table1;
+   * select * from table1 where (a=b or (c>2 and d>10)) as 271a2df28abb469da3ee87566873fdbd;
+   * select split('a',',')[0] as a2 from 271a2df28abb469da3ee87566873fdbd as a3ab7cc1682f4f11935cbfa3281bf454;
+   */
+  test("project with specific table name") {
+    val genCode = Byzer().
+      load.format("csv").path("/tmp/jack").options().add("header", "true").end.namedTableName("table1").end.
+      filter.from("table1").or.add(Expr(Some("a=b"))).add(And(Expr(Some("c>2")), Expr(Some("d>10")))).end.end.
+      columns.addColumn(Expr(Some("split('a',',')[0] as a2"))).end.
+      toScript
+
     println(genCode)
   }
 
@@ -57,20 +110,7 @@ Some examples:
     println(genCode)
   }
 
-  /**
-   * load csv.`/tmp/jack` where `header`='''true''' as table1;
-   * select * from table1 where (a=b or (c>2 and d>10)) as 271a2df28abb469da3ee87566873fdbd;
-   * select split('a',',')[0] as a2 from 271a2df28abb469da3ee87566873fdbd as a3ab7cc1682f4f11935cbfa3281bf454;
-   */
-  test("project with specific table name") {
-    val genCode = Byzer().
-      load.format("csv").path("/tmp/jack").options().add("header", "true").end.namedTableName("table1").end.
-      filter.from("table1").or.add(Expr(Some("a=b"))).add(And(Expr(Some("c>2")), Expr(Some("d>10")))).end.end.
-      columns.addColumn(Expr(Some("split('a',',')[0] as a2"))).end.
-      toScript
-
-    println(genCode)
-  }
+  
 
   /**
    * load csv.`/tmp/jack` where `header`='''true''' as e7a9b351064b4cd399b819defbfbf5f0;

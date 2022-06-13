@@ -25,6 +25,10 @@ object Byzer {
 class Byzer {
   private val blocks = new ArrayBuffer[BaseNode]()
 
+  def getByTag(name: String): List[BaseNode] = {
+    blocks.filter(_.getTag.isDefined).filter(_.getTag.get == name).toList
+  }
+
   def load = {
     val block = new Load(this)
     blocks += block
@@ -95,6 +99,8 @@ trait BaseNode {
   def namedTableName(tableName: String): BaseNode
 
   def tag(str: String): BaseNode
+
+  def getTag: Option[String]
 
   def end: Byzer
 
@@ -288,6 +294,8 @@ class Load(parent: Byzer) extends BaseNode {
 
     s"""load ${_format.get}.`${_path.getOrElse("")}` ${opts.get} as ${_tableName};"""
   }
+
+  override def getTag: Option[String] = _tag
 }
 
 trait FilterNode {
@@ -429,6 +437,8 @@ class Filter(parent: Byzer) extends BaseNode {
     val cla = _clauses.map { cla => cla.toFilterNode.toFragment }.mkString(" and ")
     s"""select * from ${_from} where ${cla} as ${_tableName};"""
   }
+
+  override def getTag: Option[String] = _tag
 }
 
 
@@ -445,6 +455,8 @@ class Columns(parent: Byzer) extends BaseNode {
     _columns += expr
     this
   }
+
+  override def getTag: Option[String] = _tag
 
   def from(tableName: String) = {
     _from = tableName
@@ -472,6 +484,7 @@ class Columns(parent: Byzer) extends BaseNode {
     _isReady = true
     parent
   }
+
 
   override def options(): Options = ???
 
@@ -511,6 +524,8 @@ class Join(parent: Byzer) extends BaseNode {
     _tableName = tableName
     this
   }
+
+  override def getTag: Option[String] = _tag
 
   private var _tag: Option[String] = None
 
@@ -584,28 +599,45 @@ class Join(parent: Byzer) extends BaseNode {
 
 }
 
+class Agg(parent: GroupBy) {
+  def end = parent
+
+  def addColumn(expr: Expr) = {
+    parent._aggs += expr
+    this
+  }
+}
+
 class GroupBy(parent: Byzer) extends BaseNode {
 
   private var _isReady = false
   private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
+  private var _groups = ArrayBuffer[Expr]()
+  private[generator] var _aggs = ArrayBuffer[Expr]()
 
   private var _from = parent.lastTableName
-
-  private var _joinTable: Option[String] = None
-  private var _on: Option[String] = None
-  private var _leftColumns: Option[String] = None
-  private var _rightColumns: Option[String] = None
 
   def from(expr: Expr) = {
     _from = expr.toFragment
     this
   }
 
+  def addColumn(expr: Expr) = {
+    _groups += expr
+    this
+  }
+
+  def agg() = {
+    new Agg(this)
+  }
+
   override def tableName: String = {
     require(_isReady, "end is not called")
     _tableName
   }
+
+  override def getTag: Option[String] = _tag
 
   override def namedTableName(tableName: String): BaseNode = {
     _tableName = tableName
@@ -627,7 +659,9 @@ class GroupBy(parent: Byzer) extends BaseNode {
   override def options(): Options = ???
 
   override def toBlock: String = {
-    s"""select ${_leftColumns.get},${_rightColumns.get} from ${_from} ${_joinTable.get} on ${_on.get};"""
+    val groups = _groups.map(_.expr.get).mkString(",")
+    val aggs = _aggs.map(_.expr.get).mkString(",")
+    s"""select ${aggs} from ${_from} group by ${groups};"""
   }
 }
 
@@ -695,7 +729,7 @@ class Register(parent: Byzer) extends BaseNode {
     new UDF(this)
   }
 
-
+  override def getTag: Option[String] = _tag
   override def tableName: String = {
     require(_isReady, "end is not called")
     _tableName
@@ -774,7 +808,7 @@ class ET(parent: Byzer) extends BaseNode {
     _path = expr.toFragment
     this
   }
-
+  override def getTag: Option[String] = _tag
   override def tableName: String = {
     require(_isReady, "end is not called")
     _tableName
@@ -880,7 +914,7 @@ class Include(parent: Byzer) extends BaseNode {
     _mode = "lib"
     new LibInclude(this)
   }
-
+  override def getTag: Option[String] = _tag
   def `package`(s: String) = {
     _package = s
     _mode = "local"
@@ -1032,7 +1066,7 @@ class Set(parent: Byzer) extends BaseNode {
     _mode = v.sql
     this
   }
-
+  override def getTag: Option[String] = _tag
   override def tableName: String = {
     require(_isReady, "end is not called")
     _tableName
@@ -1099,7 +1133,7 @@ class Save(parent: Byzer) extends BaseNode {
 
   private var _mode = SaveAppendMode.sql
   private var _from = "command"
-
+  override def getTag: Option[String] = _tag
   def from(v: String) = {
     _from = v
     this
@@ -1171,7 +1205,7 @@ class Python(parent: Byzer) extends BaseNode {
   private var _runIn = "driver"
   private var _code: Option[String] = None
   private var _rawCode: Option[String] = None
-
+  override def getTag: Option[String] = _tag
   def input(v: String) = {
     _input = v
     this
