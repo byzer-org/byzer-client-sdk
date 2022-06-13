@@ -1,2 +1,2 @@
-./scala-client/target
-./scala-client/.idea
+scala-client/target
+scala-client/.idea

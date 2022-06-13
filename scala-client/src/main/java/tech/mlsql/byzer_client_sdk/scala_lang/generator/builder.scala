@@ -1,6 +1,7 @@
 package tech.mlsql.byzer_client_sdk.scala_lang.generator
 
 import org.apache.http.client.fluent.{Form, Request}
+import tech.mlsql.byzer_client_sdk.scala_lang.generator.hint.PythonHint
 
 import java.nio.charset.Charset
 import java.util.UUID
@@ -26,6 +27,12 @@ class Byzer {
 
   def load = {
     val block = new Load(this)
+    blocks += block
+    block
+  }
+
+  def python = {
+    val block = new Python(this)
     blocks += block
     block
   }
@@ -624,29 +631,29 @@ class GroupBy(parent: Byzer) extends BaseNode {
   }
 }
 
-class UDF(parent:Register) {
+class UDF(parent: Register) {
   def end = parent
-  
+
   def name(s: String) = {
     parent._name = s
     this
   }
 
-  def code(s:String) = {
+  def code(s: String) = {
     parent._code = Some(s)
     this
   }
 
-  def tpe(s:UDFType) = {
+  def tpe(s: UDFType) = {
     parent._tpe = s.sql
     this
   }
 
-  def lang(s:LangType) = {
+  def lang(s: LangType) = {
     parent._lang = s.sql
     this
   }
-  
+
 }
 
 sealed abstract class UDFType {
@@ -673,7 +680,7 @@ case object LangJavaType extends LangType {
   override def sql: String = "java"
 }
 
-class Register(parent:Byzer) extends BaseNode {
+class Register(parent: Byzer) extends BaseNode {
   private var _isReady = false
   private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
@@ -682,12 +689,11 @@ class Register(parent:Byzer) extends BaseNode {
   private[generator] var _name = "EmptyTable"
   private[generator] var _tpe = "udf"
   private[generator] var _lang = "scala"
-  private[generator] var _code:Option[String] = None
+  private[generator] var _code: Option[String] = None
 
   def udf() = {
     new UDF(this)
   }
-  
 
 
   override def tableName: String = {
@@ -1143,6 +1149,163 @@ class Save(parent: Byzer) extends BaseNode {
   override def toBlock: String = {
     require(_isReady, "end is not called")
     s"""save ${_mode} ${_from} as ${_format.get}.`${_path.getOrElse("")}` ${_options.toFragment};"""
+  }
+}
+
+class Python(parent: Byzer) extends BaseNode {
+
+  private var _isReady = false
+  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _tableName = _autogenTableName
+
+
+  private var _options = new Options(this)
+
+  private var _input = "command"
+  private var _cache = true
+  private var _confTable: Option[String] = None
+  private var _model: Option[String] = None
+  private var _schema: Option[String] = None
+  private var _env: Option[String] = None
+  private var _dataMode = "model"
+  private var _runIn = "driver"
+  private var _code: Option[String] = None
+  private var _rawCode: Option[String] = None
+
+  def input(v: String) = {
+    _input = v
+    this
+  }
+
+  def output(v: String) = {
+    _tableName = v
+    this
+  }
+
+  def cache(v: Boolean) = {
+    _cache = v
+    this
+  }
+
+  def confTable(v: String) = {
+    _confTable = Some(v)
+    this
+  }
+
+  def model(v: String) = {
+    _model = Some(v)
+    this
+  }
+
+  def schema(v: String) = {
+    _schema = Some(v)
+    this
+  }
+
+  def env(v: String) = {
+    _env = Some(v)
+    this
+  }
+
+  def dataMode(v: String) = {
+    _dataMode = v
+    this
+  }
+
+  def runIn(v: String) = {
+    _runIn = v
+    this
+  }
+
+  def code(v: String) = {
+    _code = Some(v)
+    this
+  }
+
+  def codeWithHint(v: String) = {
+    _rawCode = Some(v)
+    this
+  }
+
+  override def tableName: String = {
+    require(_isReady, "end is not called")
+    _tableName
+  }
+
+  override def namedTableName(tableName: String): BaseNode = {
+    _tableName = tableName
+    this
+  }
+
+  private var _tag: Option[String] = None
+
+  override def tag(str: String): BaseNode = {
+    _tag = Some(str)
+    this
+  }
+
+  override def end: Byzer = {
+    _isReady = true
+    parent
+  }
+
+  override def options(): Options = {
+    _options
+  }
+
+  override def toBlock: String = {
+    require(_isReady, "end is not called")
+
+    def confTableStr = {
+      if (_confTable.isDefined) {
+        s"""#%confTable=${_confTable.get}"""
+      } else {
+        ""
+      }
+    }
+
+    def modelStr = {
+      if (_model.isDefined) {
+        s"""#%model=${_model.get}"""
+      } else {
+        ""
+      }
+    }
+
+    def schemaStr = {
+      if (_schema.isDefined) {
+        s"""#%schema=${_schema.get}"""
+      } else {
+        ""
+      }
+    }
+
+    def envStr = {
+      if (_env.isDefined) {
+        s"""#%env=${_env.get}"""
+      } else {
+        ""
+      }
+    }
+
+    val finalCode = if (_rawCode.isDefined) {
+      _rawCode.get
+    } else {
+      s"""#%python
+         |#%input=${_input}
+         |#%output=${_tableName}
+         |#%cache=${_cache.toString}
+         |${confTableStr}
+         |${modelStr}
+         |${schemaStr}
+         |${envStr}
+         |#%dataMode=${_dataMode}
+         |#%runIn=${_runIn}
+         |${_code.get}
+         |""".stripMargin
+    }
+    val ph = new PythonHint
+    ph.rewrite(finalCode, Map())
   }
 }
 
