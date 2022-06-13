@@ -228,5 +228,5 @@ class ByzerScriptTest extends AnyFunSuite {
     val t1 = byzer.getByTag("t1")
     println(t1.head.tableName)
   }
-
+  
 }

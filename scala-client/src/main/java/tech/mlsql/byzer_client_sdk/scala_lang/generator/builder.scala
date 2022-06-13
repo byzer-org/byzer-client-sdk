@@ -1,9 +1,7 @@
 package tech.mlsql.byzer_client_sdk.scala_lang.generator
 
-import org.apache.http.client.fluent.{Form, Request}
 import tech.mlsql.byzer_client_sdk.scala_lang.generator.hint.PythonHint
 
-import java.nio.charset.Charset
 import java.util.UUID
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -24,9 +22,27 @@ object Byzer {
 
 class Byzer {
   private val blocks = new ArrayBuffer[BaseNode]()
+  private var _cluster = new Cluster(this)
 
   def getByTag(name: String): List[BaseNode] = {
     blocks.filter(_.getTag.isDefined).filter(_.getTag.get == name).toList
+  }
+
+  def getUntilTag(name: String): List[BaseNode] = {
+    blocks.zipWithIndex.filter(_._1.getTag.isDefined).filter(_._1.getTag.get == name).headOption match {
+      case Some(item) => blocks.slice(item._2, blocks.size).toList
+      case None => List()
+    }
+  }
+
+  def run() = {
+    _cluster.getMatchedEngines.map { engine =>
+      engine.run()
+    }
+  }
+
+  def cluster() = {
+    _cluster
   }
 
   def load = {
@@ -83,6 +99,12 @@ class Byzer {
     block
   }
 
+  def variable = {
+    val block = new Set(this)
+    blocks += block
+    block
+  }
+
   def toScript: String = {
     blocks.map(item => item.toBlock).mkString("\n")
   }
@@ -100,13 +122,13 @@ trait BaseNode {
 
   def tag(str: String): BaseNode
 
-  def getTag: Option[String]
-
   def end: Byzer
 
   def options(): Options
 
   def toBlock: String
+
+  def getTag: Option[String]
 }
 
 class Options(parent: BaseNode) {
@@ -141,101 +163,6 @@ class Options(parent: BaseNode) {
   }
 }
 
-class Engine(parent: Byzer) {
-  private var _url = ""
-  private var _params: Map[String, String] = Map()
-
-  def url(s: String) = {
-    _url = s
-    this
-  }
-
-  private val extraParams = mutable.HashMap[String, String]()
-  extraParams.put("executeMode", "query")
-  extraParams.put("sessionPerUser", "true")
-  extraParams.put("sessionPerRequest", "true")
-  extraParams.put("includeSchema", "true")
-  extraParams.put("fetchType", "take")
-
-
-  def includeSchema(include: Boolean) = {
-    extraParams += ("includeSchema" -> include.toString)
-    this
-  }
-
-  def fetchType(fetchTpe: Boolean) = {
-    extraParams += ("fetchType" -> fetchTpe.toString)
-    this
-  }
-
-  def sql(sql: String) = {
-    extraParams += ("sql" -> sql)
-    this
-  }
-
-  def owner(owner: String) = {
-    extraParams += ("owner" -> owner)
-    this
-  }
-
-  def async(async: Boolean) = {
-    extraParams += ("async" -> async.toString)
-    this
-  }
-
-  def timeout(timeout: Long) = {
-    extraParams += ("timeout" -> timeout.toString)
-    this
-  }
-
-  def executeMode(executeMode: String) = {
-    extraParams += ("executeMode" -> executeMode)
-    this
-  }
-
-  def jobName(jobName: String) = {
-    extraParams += ("jobName" -> jobName)
-    this
-  }
-
-
-  private def param(str: String) = {
-    params().getOrElse(str, null)
-  }
-
-  private def hasParam(str: String) = {
-    params().contains(str)
-  }
-
-  private def params() = {
-    _params ++ extraParams
-  }
-
-  private def execute() = {
-
-    var newparams = params()
-
-    if (!newparams.contains("jobName")) {
-      newparams += ("jobName" -> UUID.randomUUID().toString)
-    }
-
-    val form = Form.form()
-    newparams.foreach { case (k, v) =>
-      form.add(k, v)
-    }
-
-    val content = Request.Post(_url).
-      bodyForm(form.build(), Charset.forName("utf-8")).
-      execute().returnContent().asString()
-
-    content
-
-  }
-
-  def end = {
-    parent
-  }
-}
 
 class Load(parent: Byzer) extends BaseNode {
 
@@ -246,7 +173,7 @@ class Load(parent: Byzer) extends BaseNode {
   private var _format: Option[String] = None
   private var _path: Option[String] = None
 
-  private var _options: Option[Options] = None
+  private var _options: Options = new Options(this)
 
   def format(s: String) = {
     _format = Some(s)
@@ -281,18 +208,12 @@ class Load(parent: Byzer) extends BaseNode {
   }
 
   override def options(): Options = {
-    _options = Some(new Options(this))
-    _options.get
+    _options
   }
 
   override def toBlock: String = {
     require(_isReady, "end is not called")
-
-    val opts = _options.map { item =>
-      item.toFragment
-    }
-
-    s"""load ${_format.get}.`${_path.getOrElse("")}` ${opts.get} as ${_tableName};"""
+    s"""load ${_format.get}.`${_path.getOrElse("")}` ${_options.toFragment} as ${_tableName};"""
   }
 
   override def getTag: Option[String] = _tag
@@ -730,6 +651,7 @@ class Register(parent: Byzer) extends BaseNode {
   }
 
   override def getTag: Option[String] = _tag
+
   override def tableName: String = {
     require(_isReady, "end is not called")
     _tableName
@@ -808,7 +730,9 @@ class ET(parent: Byzer) extends BaseNode {
     _path = expr.toFragment
     this
   }
+
   override def getTag: Option[String] = _tag
+
   override def tableName: String = {
     require(_isReady, "end is not called")
     _tableName
@@ -914,7 +838,9 @@ class Include(parent: Byzer) extends BaseNode {
     _mode = "lib"
     new LibInclude(this)
   }
+
   override def getTag: Option[String] = _tag
+
   def `package`(s: String) = {
     _package = s
     _mode = "local"
@@ -1066,7 +992,9 @@ class Set(parent: Byzer) extends BaseNode {
     _mode = v.sql
     this
   }
+
   override def getTag: Option[String] = _tag
+
   override def tableName: String = {
     require(_isReady, "end is not called")
     _tableName
@@ -1096,7 +1024,12 @@ class Set(parent: Byzer) extends BaseNode {
   override def toBlock: String = {
     _options.add("mode", _mode).add("scope", _lifeTime).add("type", _type)
     val opts = _options.toFragment
-    s"""set ${_name}=${_value} ${opts};"""
+    val v = _type match {
+      case "text" | "defaultParam" => if (_value.isEmpty) "\"\"" else s"'''${_value}'''"
+      case "sql" | "shell" => s"`${_value}`"
+      case "conf" => s"${_value}"
+    }
+    s"""set ${_name}=${v} ${opts};"""
   }
 }
 
@@ -1133,7 +1066,9 @@ class Save(parent: Byzer) extends BaseNode {
 
   private var _mode = SaveAppendMode.sql
   private var _from = "command"
+
   override def getTag: Option[String] = _tag
+
   def from(v: String) = {
     _from = v
     this
@@ -1205,7 +1140,9 @@ class Python(parent: Byzer) extends BaseNode {
   private var _runIn = "driver"
   private var _code: Option[String] = None
   private var _rawCode: Option[String] = None
+
   override def getTag: Option[String] = _tag
+
   def input(v: String) = {
     _input = v
     this

@@ -38,7 +38,7 @@ You can specify every output table name otherwize the system will autogenerate a
 
 ## Tag
 
-Tag help you get every block
+Tag help you get every block(load/save/select...) and get some information about it.
 
 ```scala
 test("tag") {
@@ -51,6 +51,36 @@ test("tag") {
     val t1 = byzer.getByTag("t1")    
     println(t1.head.tableName)
   }
+```
+
+## Execute Byzer Script
+
+You can setup Byzer engine url and then build byzer script to run.
+
+```
+test("engine") {
+    val byzer = Byzer().cluster().
+      engine.url("http://127.0.0.1:9004/run/script").owner("admin").end.
+      backendStrategy(new ResourceAwareStrategy("")).
+      end
+    val script = byzer.variable.name(Expr(Some("data"))).value(Expr(Some(
+      """
+        |{ "x": 100, "y": 200, "z": 200 ,"dataType":"A group"}
+        |{ "x": 120, "y": 100, "z": 260 ,"dataType":"B group"}
+        |""".stripMargin))).end.load.format("jsonStr").path("data").namedTableName("table1").end
+    val res = script.run()
+    println(res.head.returnContent().asString())
+  }
+```
+
+Configure two engine urls and pick the right engine with resource aware strategy
+
+```scala
+ val byzer = Byzer().cluster().
+      engine.url("http://127.0.0.1:9004/run/script").owner("admin").end.
+      engine.url("http://127.0.0.1:9003/run/script").owner("admin").end.
+      backendStrategy(new ResourceAwareStrategy("")).
+      end
 ```
 
 ## Scala 
