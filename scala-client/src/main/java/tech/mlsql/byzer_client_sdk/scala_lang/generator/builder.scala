@@ -131,10 +131,17 @@ trait BaseNode {
   def getTag: Option[String]
 }
 
+case class OptionValue(value: String, quoteStr: Option[String])
+
 class Options(parent: BaseNode) {
-  private val o = new mutable.HashMap[String, String]()
+  private val o = new mutable.HashMap[String, OptionValue]()
 
   def add(name: String, value: String): Options = {
+    o.put(name, OptionValue(value, None))
+    this
+  }
+
+  def addWithQuotedStr(name: String, value: OptionValue) = {
     o.put(name, value)
     this
   }
@@ -147,11 +154,16 @@ class Options(parent: BaseNode) {
 
   def toFragment = {
     val opts = o.map { case (k, v) =>
-      if (v.isEmpty) {
-        s"""`${k}`="""""
+      if (v.quoteStr.isEmpty) {
+        if (v.value.isEmpty) {
+          s"""`${k}`="""""
+        } else {
+          s"""`${k}`='''${v.value}'''"""
+        }
       } else {
-        s"""`${k}`='''${v}'''"""
+        s"""`${k}`=${v.quoteStr}${v}${v.quoteStr}"""
       }
+
     }.mkString(" and ")
 
     val optStr = if (!o.isEmpty) {

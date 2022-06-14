@@ -12,22 +12,26 @@ class ByzerScriptTest extends AnyFunSuite {
    * load csv.`/tmp/jack` where `header`='''true''' as 004f7b1361904755a223a543c613a387;
    */
   test("load") {
-    val genCode = Byzer().load.format("csv").path("/tmp/jack").
-      options().add("header", "true").end.
+    val byzer = Byzer()
+    val genCode = byzer.load.format("csv").path("/tmp/jack").
+      options().add("header", "true").end.tag("table1").
       end.toScript
-    println(genCode)
+    val t = byzer.getByTag("table1").head
+    assert(genCode == s"""load csv.`/tmp/jack` where `header`='''true''' as ${t.tableName};""")
   }
 
   /**
-   * load csv.`/tmp/jack` where `header`='''true''' as 20e4e3bd09b448f4b20b412fab5a7c56;
-   * select * from 20e4e3bd09b448f4b20b412fab5a7c56 where (a=b or (c>2 and d>10)) as f82f555639044b46afbc7231efeb37c4;
+   * load csv.`/tmp/jack` where `header`='''true''' as table1;
+   * select * from table1 where (a=b or (c>2 and d>10)) as table2;
    */
   test("filter") {
     val genCode = Byzer().
-      load.format("csv").path("/tmp/jack").options().add("header", "true").end.end.
-      filter.or.add(Expr(Some("a=b"))).add(And(Expr(Some("c>2")), Expr(Some("d>10")))).end.end.
+      load.format("csv").path("/tmp/jack").options().add("header", "true").end.namedTableName("table1").end.
+      filter.or.add(Expr(Some("a=b"))).add(And(Expr(Some("c>2")), Expr(Some("d>10")))).end.namedTableName("table2").end.
       toScript
-    println(genCode)
+    assert(genCode ==
+      s"""load csv.`/tmp/jack` where `header`='''true''' as table1;
+         |select * from table1 where (a=b or (c>2 and d>10)) as table2;""".stripMargin)
   }
 
   /**
@@ -228,5 +232,5 @@ class ByzerScriptTest extends AnyFunSuite {
     val t1 = byzer.getByTag("t1")
     println(t1.head.tableName)
   }
-  
+
 }
