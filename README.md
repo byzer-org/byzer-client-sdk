@@ -19,5 +19,10 @@ load csv.`/tmp/jack` where `header`='''true''' as 004f7b1361904755a223a543c613a3
 
 ## Tutorial
 
-1 [scala-client](./scala-client/README.md)
+1. [scala-client](./scala-client/README.md)
+2. java-client
+3. go-client
+4. rust-client
+5. typescript-client
+
 
