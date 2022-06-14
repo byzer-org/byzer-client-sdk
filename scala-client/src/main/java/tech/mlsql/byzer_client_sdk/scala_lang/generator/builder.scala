@@ -1,6 +1,7 @@
 package tech.mlsql.byzer_client_sdk.scala_lang.generator
 
 import tech.mlsql.byzer_client_sdk.scala_lang.generator.hint.PythonHint
+import tech.mlsql.common.utils.serder.json.JSONTool
 
 import java.util.UUID
 import scala.collection.mutable
@@ -23,6 +24,10 @@ object Byzer {
 class Byzer {
   private val blocks = new ArrayBuffer[BaseNode]()
   private var _cluster = new Cluster(this)
+
+  def toJson = {
+
+  }
 
   def getByTag(name: String): List[BaseNode] = {
     blocks.filter(_.getTag.isDefined).filter(_.getTag.get == name).toList
@@ -129,6 +134,10 @@ trait BaseNode {
   def toBlock: String
 
   def getTag: Option[String]
+
+  def toJson: String
+
+  def fromJson(json: String): BaseNode
 }
 
 case class OptionValue(value: String, quoteStr: Option[String])
@@ -175,17 +184,26 @@ class Options(parent: BaseNode) {
   }
 }
 
+case class LoadMeta(_tag: Option[String],
+                    _isReady: Boolean,
+                    _autogenTableName: String,
+                    _tableName: String,
+                    _format: Option[String],
+                    _path: Option[String],
+                    _options: Map[String, OptionValue]
+                   )
 
 class Load(parent: Byzer) extends BaseNode {
 
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
   private var _format: Option[String] = None
   private var _path: Option[String] = None
 
   private var _options: Options = new Options(this)
+
 
   def format(s: String) = {
     _format = Some(s)
@@ -229,6 +247,31 @@ class Load(parent: Byzer) extends BaseNode {
   }
 
   override def getTag: Option[String] = _tag
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[LoadMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _format = v._format
+    _path = v._path
+    _options = new Options(this)
+    v._options.foreach { item =>
+      _options.addWithQuotedStr(item._1, item._2)
+    }
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(LoadMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _format = _format,
+      _path = _path,
+      _options = _options.items))
+  }
 }
 
 trait FilterNode {
@@ -318,12 +361,37 @@ class OrOpt(parent: Filter) extends BaseOpt {
   }
 }
 
+case class FilterMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                      _tableName: String, _from: String,
+                      _clauses: ArrayBuffer[BaseOpt])
+
 class Filter(parent: Byzer) extends BaseNode {
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
   private var _clauses = ArrayBuffer[BaseOpt]()
   private var _from = parent.lastTableName
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[FilterMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _from = v._from
+    _clauses = v._clauses
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(FilterMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _from = _from,
+      _clauses = _clauses
+    ))
+  }
 
   def or(): OrOpt = {
     val n = new OrOpt(this)
@@ -374,15 +442,40 @@ class Filter(parent: Byzer) extends BaseNode {
   override def getTag: Option[String] = _tag
 }
 
+case class ColumnsMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                       _tableName: String, _from: String,
+                       _columns: ArrayBuffer[Expr])
 
 class Columns(parent: Byzer) extends BaseNode {
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
   private var _from = parent.lastTableName
 
   private var _columns = ArrayBuffer[Expr]()
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[ColumnsMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _from = v._from
+    _columns = v._columns
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(ColumnsMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _from = _from,
+      _columns = _columns
+    ))
+  }
+
 
   def addColumn(expr: Expr): Columns = {
     _columns += expr
@@ -430,10 +523,16 @@ class Columns(parent: Byzer) extends BaseNode {
 /**
  * Byzer().join.from(...).left(...).on(...).leftColumns(....).rightColumns(.....)
  */
+case class JoinMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                    _tableName: String, _from: String,
+                    _joinTable: Option[String],
+                    _on: Option[String],
+                    _leftColumns: Option[String], _rightColumns: Option[String])
+
 class Join(parent: Byzer) extends BaseNode {
 
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
   private var _from = parent.lastTableName
@@ -442,6 +541,33 @@ class Join(parent: Byzer) extends BaseNode {
   private var _on: Option[String] = None
   private var _leftColumns: Option[String] = None
   private var _rightColumns: Option[String] = None
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[JoinMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _from = v._from
+    _joinTable = v._joinTable
+    _on = v._on
+    _leftColumns = v._leftColumns
+    _rightColumns = v._rightColumns
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(JoinMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _from = _from,
+      _joinTable = _joinTable,
+      _on = _on,
+      _leftColumns = _leftColumns,
+      _rightColumns = _rightColumns,
+    ))
+  }
 
   def from(expr: Expr) = {
     _from = expr.toFragment
@@ -541,15 +667,45 @@ class Agg(parent: GroupBy) {
   }
 }
 
+case class GroupByMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                       _tableName: String, _from: String,
+                       _groups: ArrayBuffer[Expr],
+                       _aggs: ArrayBuffer[Expr]
+                      )
+
 class GroupBy(parent: Byzer) extends BaseNode {
 
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
   private var _groups = ArrayBuffer[Expr]()
   private[generator] var _aggs = ArrayBuffer[Expr]()
 
   private var _from = parent.lastTableName
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[GroupByMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _from = v._from
+    _groups = v._groups
+    _aggs = v._aggs
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(GroupByMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _from = _from,
+      _groups = _groups,
+      _aggs = _aggs
+    ))
+  }
+
 
   def from(expr: Expr) = {
     _from = expr.toFragment
@@ -647,9 +803,18 @@ case object LangJavaType extends LangType {
   override def sql: String = "java"
 }
 
+case class RegisterMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                        _tableName: String,
+                        _options: Map[String, OptionValue],
+                        _name: String,
+                        _tpe: String,
+                        _lang: String,
+                        _code: Option[String]
+                       )
+
 class Register(parent: Byzer) extends BaseNode {
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
   private[generator] var _options = new Options(this)
@@ -657,6 +822,37 @@ class Register(parent: Byzer) extends BaseNode {
   private[generator] var _tpe = "udf"
   private[generator] var _lang = "scala"
   private[generator] var _code: Option[String] = None
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[RegisterMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _name = v._name
+    _tpe = v._tpe
+    _code = v._code
+    _lang = v._lang
+
+    _options = new Options(this)
+    v._options.foreach { item =>
+      _options.addWithQuotedStr(item._1, item._2)
+    }
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(RegisterMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _name = _name,
+      _tpe = _tpe,
+      _code = _code,
+      _lang = _lang,
+      _options = _options.items
+    ))
+  }
 
   def udf() = {
     new UDF(this)
@@ -698,13 +894,22 @@ class Register(parent: Byzer) extends BaseNode {
   }
 }
 
+case class ETMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                  _tableName: String,
+                  _options: Map[String, OptionValue],
+                  _name: String,
+                  _from: String,
+                  _path: String,
+                  _etType: String
+                 )
+
 /**
  *
  * Byzer().mod.run.from(...).name(...).end
  */
 class ET(parent: Byzer) extends BaseNode {
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
   private var _from = parent.lastTableName
@@ -712,6 +917,38 @@ class ET(parent: Byzer) extends BaseNode {
   private var _name = "EmptyTable"
   private var _path = ""
   private var _etType = "run"
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[ETMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _name = v._name
+    _from = v._from
+    _path = v._path
+    _etType = v._etType
+
+    _options = new Options(this)
+    v._options.foreach { item =>
+      _options.addWithQuotedStr(item._1, item._2)
+    }
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(ETMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _name = _name,
+      _from = _from,
+      _path = _path,
+      _etType = _etType,
+      _options = _options.items
+    ))
+  }
+
 
   def from(expr: Expr) = {
     _from = expr.toFragment
@@ -820,6 +1057,7 @@ class ProjectInclude(parent: Include) {
   }
 }
 
+
 /**
  *
  * // include Byzer lib
@@ -827,10 +1065,22 @@ class ProjectInclude(parent: Include) {
  * // include Byzer package
  * Byzer().include.package(...).end
  */
+case class IncludeMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                       _tableName: String,
+                       _lib: String,
+                       _commit: Option[String],
+                       _alias: String,
+                       _forceUpdate: Boolean,
+                       _package: String,
+                       _path: String,
+                       _mode: String,
+                       _libMirror: Option[String]
+                      )
+
 class Include(parent: Byzer) extends BaseNode {
 
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
   private var _lib = ""
@@ -844,6 +1094,39 @@ class Include(parent: Byzer) extends BaseNode {
   private[generator] var _mode = "lib"
 
   private[generator] var _libMirror: Option[String] = None
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[IncludeMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _lib = v._lib
+    _commit = v._commit
+    _forceUpdate = v._forceUpdate
+    _package = v._package
+    _path = v._path
+    _mode = v._mode
+    _libMirror = v._libMirror
+    _alias = v._alias
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(IncludeMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _lib = _lib,
+      _commit = _commit,
+      _forceUpdate = _forceUpdate,
+      _package = _package,
+      _path = _path,
+      _mode = _mode,
+      _libMirror = _libMirror,
+      _alias = _alias
+    ))
+  }
 
   def lib(s: String) = {
     _lib = s
@@ -963,13 +1246,23 @@ case object VariableRuntimeMode extends VariableMode {
 }
 
 
+case class SetMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                   _tableName: String,
+                   _options: Map[String, OptionValue],
+                   _name: String,
+                   _value: String,
+                   _type: String,
+                   _mode: String,
+                   _lifeTime: String
+                  )
+
 /**
  * Byzer.variable.name(...).value(....).tpe(....).lifeTime(...).mode(...).options.add("...","....").end.end
  */
 class Set(parent: Byzer) extends BaseNode {
 
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
   private var _name = ""
@@ -979,6 +1272,40 @@ class Set(parent: Byzer) extends BaseNode {
   private var _lifeTime = VariableRequestLifeTime.sql
 
   private var _options = new Options(this)
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[SetMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _name = v._name
+    _value = v._value
+    _type = v._type
+    _mode = v._mode
+    _lifeTime = v._lifeTime
+
+    _options = new Options(this)
+    v._options.foreach { item =>
+      _options.addWithQuotedStr(item._1, item._2)
+    }
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(SetMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _name = _name,
+      _value = _value,
+      _type = _type,
+      _mode = _mode,
+      _lifeTime = _lifeTime,
+      _options = _options.items
+    ))
+  }
+
 
   def name(expr: Expr) = {
     _name = expr.toFragment
@@ -1065,10 +1392,19 @@ case object SaveErrorIfExistsMode extends SaveMode {
   override def sql: String = "errorIfExists"
 }
 
+case class SaveMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                    _tableName: String,
+                    _options: Map[String, OptionValue],
+                    _format: Option[String],
+                    _path: Option[String],
+                    _mode: String,
+                    _from: String
+                   )
+
 class Save(parent: Byzer) extends BaseNode {
 
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
   private var _format: Option[String] = None
@@ -1080,6 +1416,37 @@ class Save(parent: Byzer) extends BaseNode {
   private var _from = "command"
 
   override def getTag: Option[String] = _tag
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[SaveMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _format = v._format
+    _path = v._path
+    _mode = v._mode
+    _from = v._from
+    _options = new Options(this)
+    v._options.foreach { item =>
+      _options.addWithQuotedStr(item._1, item._2)
+    }
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(SaveMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _format = _format,
+      _path = _path,
+      _mode = _mode,
+      _from = _from,
+      _options = _options.items
+    ))
+  }
+
 
   def from(v: String) = {
     _from = v
@@ -1133,10 +1500,26 @@ class Save(parent: Byzer) extends BaseNode {
   }
 }
 
+case class PythonMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+                      _tableName: String,
+                      _options: Map[String, OptionValue],
+                      _input: String,
+                      _cache: Boolean,
+                      _confTable: Option[String],
+                      _model: Option[String],
+                      _schema: Option[String],
+                      _env: Option[String],
+                      _dataMode: String,
+                      _runIn: String,
+                      _code: Option[String],
+                      _rawCode: Option[String]
+
+                     )
+
 class Python(parent: Byzer) extends BaseNode {
 
   private var _isReady = false
-  private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
+  private var _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
 
 
@@ -1152,6 +1535,48 @@ class Python(parent: Byzer) extends BaseNode {
   private var _runIn = "driver"
   private var _code: Option[String] = None
   private var _rawCode: Option[String] = None
+
+  override def fromJson(json: String): BaseNode = {
+    val v = JSONTool.parseJson[PythonMeta](json)
+    _tag = v._tag
+    _isReady = v._isReady
+    _autogenTableName = v._autogenTableName
+    _tableName = v._tableName
+    _input = v._input
+    _cache = v._cache
+    _confTable = v._confTable
+    _model = v._model
+    _schema = v._schema
+    _env = v._env
+    _dataMode = v._dataMode
+    _runIn = v._runIn
+    _code = v._code
+    _rawCode = v._rawCode
+    _options = new Options(this)
+    v._options.foreach { item =>
+      _options.addWithQuotedStr(item._1, item._2)
+    }
+    this
+  }
+
+  override def toJson: String = {
+    JSONTool.toJsonStr(PythonMeta(_tag = _tag,
+      _isReady = _isReady,
+      _autogenTableName = _autogenTableName,
+      _tableName = _tableName,
+      _input = _input,
+      _cache = _cache,
+      _confTable = _confTable,
+      _model = _model,
+      _schema = _schema,
+      _env = _env,
+      _dataMode = _dataMode,
+      _runIn = _runIn,
+      _code = _code,
+      _rawCode = _rawCode,
+      _options = _options.items
+    ))
+  }
 
   override def getTag: Option[String] = _tag
 
