@@ -1,9 +1,11 @@
 package tech.mlsql.byzer_client_sdk.scala_lang.generator
 
+import net.sf.json.{JSONArray, JSONObject}
 import tech.mlsql.byzer_client_sdk.scala_lang.generator.hint.PythonHint
 import tech.mlsql.common.utils.serder.json.JSONTool
 
 import java.util.UUID
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -25,8 +27,33 @@ class Byzer {
   private val blocks = new ArrayBuffer[BaseNode]()
   private var _cluster = new Cluster(this)
 
-  def toJson = {
+  def toJson(pretty: Boolean = false) = {
+    val obj = new JSONObject()
+    obj.put("version", 1.0)
+    val arr = new JSONArray()
+    blocks.map(_.toJson).map(item => JSONObject.fromObject(item)).foreach(item => arr.add(item))
+    obj.put("blocks", arr)
+    obj.put("cluster", JSONObject.fromObject(_cluster.toJson))
+    if (pretty) {
+      obj.toString(4)
+    }
+    else {
+      obj.toString
+    }
+  }
 
+  def fromJson(s: String): Byzer = {
+    val obj = JSONObject.fromObject(s)
+    obj.getJSONArray("blocks").asScala.foreach { item =>
+      val temp = item.asInstanceOf[JSONObject]
+      val block = Class.forName(temp.getJSONObject("__meta").getString("name")).
+        getConstructor(classOf[Byzer]).
+        newInstance(this).asInstanceOf[BaseNode]
+      block.fromJson(temp.toString)
+      blocks += block
+    }
+    _cluster = _cluster.fromJson(obj.getJSONObject("cluster").toString)
+    this
   }
 
   def getByTag(name: String): List[BaseNode] = {
@@ -184,7 +211,10 @@ class Options(parent: BaseNode) {
   }
 }
 
-case class LoadMeta(_tag: Option[String],
+case class MetaMeta(name: String)
+
+case class LoadMeta(__meta: MetaMeta,
+                    _tag: Option[String],
                     _isReady: Boolean,
                     _autogenTableName: String,
                     _tableName: String,
@@ -216,7 +246,6 @@ class Load(parent: Byzer) extends BaseNode {
   }
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -264,7 +293,9 @@ class Load(parent: Byzer) extends BaseNode {
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(LoadMeta(_tag = _tag,
+    JSONTool.toJsonStr(LoadMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
@@ -293,6 +324,12 @@ trait FilterNode {
   }
 }
 
+trait FilterNodeMeta {}
+
+case class AndFilterNodeMeta(k: String, left: FilterNodeMeta,right: FilterNodeMeta) extends FilterNodeMeta
+case class OrFilterNodeMeta(k: String, left: FilterNodeMeta,right: FilterNodeMeta) extends FilterNodeMeta
+case class ExprFilterNodeMeta(k: String, v: Expr) extends FilterNodeMeta
+
 case class And(left: FilterNode, right: FilterNode) extends FilterNode
 
 case class Or(left: FilterNode, right: FilterNode) extends FilterNode
@@ -303,10 +340,13 @@ trait BaseOpt {
   def toFilterNode: FilterNode
 }
 
+case class AndOrOptMeta(__meta: MetaMeta, _clauses: List[FilterNodeMeta])
+
+
 class AndOpt(parent: Filter) extends BaseOpt {
 
   private var _isReady = false
-  private val _clauses = ArrayBuffer[FilterNode]()
+  private[generator] val _clauses = ArrayBuffer[FilterNode]()
 
 
   def add(filterNode: FilterNode) = {
@@ -330,7 +370,7 @@ class OrOpt(parent: Filter) extends BaseOpt {
   private var _isReady = false
   private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
   private var _tableName = _autogenTableName
-  private var _clauses = ArrayBuffer[FilterNode]()
+  private[generator] var _clauses = ArrayBuffer[FilterNode]()
 
 
   def add(filterNode: FilterNode) = {
@@ -339,7 +379,6 @@ class OrOpt(parent: Filter) extends BaseOpt {
   }
 
   def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -361,9 +400,9 @@ class OrOpt(parent: Filter) extends BaseOpt {
   }
 }
 
-case class FilterMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class FilterMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                       _tableName: String, _from: String,
-                      _clauses: ArrayBuffer[BaseOpt])
+                      _clauses: List[AndOrOptMeta])
 
 class Filter(parent: Byzer) extends BaseNode {
   private var _isReady = false
@@ -372,24 +411,92 @@ class Filter(parent: Byzer) extends BaseNode {
   private var _clauses = ArrayBuffer[BaseOpt]()
   private var _from = parent.lastTableName
 
+  private def toFilterNode(json: JSONObject): FilterNode = {
+
+    json.getString("k") match {
+      case "or" =>
+        val left = json.getJSONObject("left")
+        val right = json.getJSONObject("right")
+        Or(toFilterNode(left), toFilterNode(right))
+      case "and" =>
+        val left = json.getJSONObject("left")
+        val right = json.getJSONObject("right")
+        And(toFilterNode(left), toFilterNode(right))
+      case "expr" =>
+        val v = json.getJSONObject("v")
+        Expr(Some(v.getString("expr")))
+    }
+  }
+
+  private def toFilterNodeMeta(v: FilterNode): FilterNodeMeta = {
+    v match {
+      case _ if v.isInstanceOf[And] =>
+        val vv = v.asInstanceOf[And]
+        AndFilterNodeMeta("and",toFilterNodeMeta(vv.left),toFilterNodeMeta(vv.right))
+      case _ if v.isInstanceOf[Or] =>
+        val vv = v.asInstanceOf[Or]
+        OrFilterNodeMeta("or",toFilterNodeMeta(vv.left),toFilterNodeMeta(vv.right))
+      case _ if v.isInstanceOf[Expr] =>
+        ExprFilterNodeMeta("expr",v.asInstanceOf[Expr])
+    }
+  }
+
   override def fromJson(json: String): BaseNode = {
-    val v = JSONTool.parseJson[FilterMeta](json)
+    val obj = JSONObject.fromObject(json)
+    val clauseTemp = obj.remove("_clauses")
+
+    clauseTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
+      val t = item.asInstanceOf[JSONObject]
+      val opt = Class.forName(t.getJSONObject("__meta").getString("name")).
+        getConstructor(classOf[Filter]).
+        newInstance(this).asInstanceOf[BaseOpt]
+      opt match {
+        case _ if opt.isInstanceOf[AndOpt] =>
+          val andOpt = opt.asInstanceOf[AndOpt]
+          t.getJSONArray("_clauses").asScala.map { t =>
+            andOpt.add(toFilterNode(t.asInstanceOf[JSONObject]))
+          }
+        case _ if opt.isInstanceOf[OrOpt] =>
+          val orOpt = opt.asInstanceOf[AndOpt]
+          t.getJSONArray("_clauses").asScala.map { t =>
+            orOpt.add(toFilterNode(t.asInstanceOf[JSONObject]))
+          }
+      }
+      _clauses += opt
+    }
+
+    val v = JSONTool.parseJson[FilterMeta](obj.toString)
     _tag = v._tag
     _isReady = v._isReady
     _autogenTableName = v._autogenTableName
     _tableName = v._tableName
     _from = v._from
-    _clauses = v._clauses
     this
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(FilterMeta(_tag = _tag,
+
+    val clauses = _clauses.map { item =>
+      item match {
+        case _ if item.isInstanceOf[AndOpt] =>
+          AndOrOptMeta(MetaMeta(classOf[AndOpt].getName), item.asInstanceOf[AndOpt]._clauses.map { t =>
+            toFilterNodeMeta(t)
+          }.toList)
+        case _ if item.isInstanceOf[OrOpt] =>
+          AndOrOptMeta(MetaMeta(classOf[OrOpt].getName), item.asInstanceOf[OrOpt]._clauses.map { t =>
+            toFilterNodeMeta(t)
+          }.toList)
+      }
+    }
+
+    JSONTool.toJsonStr(FilterMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
       _from = _from,
-      _clauses = _clauses
+      _clauses = clauses.toList
     ))
   }
 
@@ -411,7 +518,6 @@ class Filter(parent: Byzer) extends BaseNode {
   }
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -442,9 +548,9 @@ class Filter(parent: Byzer) extends BaseNode {
   override def getTag: Option[String] = _tag
 }
 
-case class ColumnsMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class ColumnsMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                        _tableName: String, _from: String,
-                       _columns: ArrayBuffer[Expr])
+                       _columns: List[Expr])
 
 class Columns(parent: Byzer) extends BaseNode {
   private var _isReady = false
@@ -462,17 +568,19 @@ class Columns(parent: Byzer) extends BaseNode {
     _autogenTableName = v._autogenTableName
     _tableName = v._tableName
     _from = v._from
-    _columns = v._columns
+    _columns ++= v._columns
     this
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(ColumnsMeta(_tag = _tag,
+    JSONTool.toJsonStr(ColumnsMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
       _from = _from,
-      _columns = _columns
+      _columns = _columns.toList
     ))
   }
 
@@ -497,7 +605,6 @@ class Columns(parent: Byzer) extends BaseNode {
   }
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -523,7 +630,7 @@ class Columns(parent: Byzer) extends BaseNode {
 /**
  * Byzer().join.from(...).left(...).on(...).leftColumns(....).rightColumns(.....)
  */
-case class JoinMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class JoinMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                     _tableName: String, _from: String,
                     _joinTable: Option[String],
                     _on: Option[String],
@@ -557,7 +664,9 @@ class Join(parent: Byzer) extends BaseNode {
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(JoinMeta(_tag = _tag,
+    JSONTool.toJsonStr(JoinMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
@@ -575,7 +684,6 @@ class Join(parent: Byzer) extends BaseNode {
   }
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -667,10 +775,10 @@ class Agg(parent: GroupBy) {
   }
 }
 
-case class GroupByMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class GroupByMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                        _tableName: String, _from: String,
-                       _groups: ArrayBuffer[Expr],
-                       _aggs: ArrayBuffer[Expr]
+                       _groups: List[Expr],
+                       _aggs: List[Expr]
                       )
 
 class GroupBy(parent: Byzer) extends BaseNode {
@@ -690,19 +798,21 @@ class GroupBy(parent: Byzer) extends BaseNode {
     _autogenTableName = v._autogenTableName
     _tableName = v._tableName
     _from = v._from
-    _groups = v._groups
-    _aggs = v._aggs
+    _groups ++= v._groups
+    _aggs ++= v._aggs
     this
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(GroupByMeta(_tag = _tag,
+    JSONTool.toJsonStr(GroupByMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
       _from = _from,
-      _groups = _groups,
-      _aggs = _aggs
+      _groups = _groups.toList,
+      _aggs = _aggs.toList
     ))
   }
 
@@ -722,7 +832,6 @@ class GroupBy(parent: Byzer) extends BaseNode {
   }
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -803,7 +912,7 @@ case object LangJavaType extends LangType {
   override def sql: String = "java"
 }
 
-case class RegisterMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class RegisterMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                         _tableName: String,
                         _options: Map[String, OptionValue],
                         _name: String,
@@ -842,7 +951,9 @@ class Register(parent: Byzer) extends BaseNode {
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(RegisterMeta(_tag = _tag,
+    JSONTool.toJsonStr(RegisterMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
@@ -861,7 +972,6 @@ class Register(parent: Byzer) extends BaseNode {
   override def getTag: Option[String] = _tag
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -894,7 +1004,7 @@ class Register(parent: Byzer) extends BaseNode {
   }
 }
 
-case class ETMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class ETMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                   _tableName: String,
                   _options: Map[String, OptionValue],
                   _name: String,
@@ -937,7 +1047,9 @@ class ET(parent: Byzer) extends BaseNode {
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(ETMeta(_tag = _tag,
+    JSONTool.toJsonStr(ETMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
@@ -983,7 +1095,6 @@ class ET(parent: Byzer) extends BaseNode {
   override def getTag: Option[String] = _tag
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -1065,7 +1176,7 @@ class ProjectInclude(parent: Include) {
  * // include Byzer package
  * Byzer().include.package(...).end
  */
-case class IncludeMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class IncludeMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                        _tableName: String,
                        _lib: String,
                        _commit: Option[String],
@@ -1113,7 +1224,9 @@ class Include(parent: Byzer) extends BaseNode {
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(IncludeMeta(_tag = _tag,
+    JSONTool.toJsonStr(IncludeMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
@@ -1149,7 +1262,6 @@ class Include(parent: Byzer) extends BaseNode {
   }
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -1246,7 +1358,7 @@ case object VariableRuntimeMode extends VariableMode {
 }
 
 
-case class SetMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class SetMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                    _tableName: String,
                    _options: Map[String, OptionValue],
                    _name: String,
@@ -1293,7 +1405,9 @@ class Set(parent: Byzer) extends BaseNode {
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(SetMeta(_tag = _tag,
+    JSONTool.toJsonStr(SetMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
@@ -1335,7 +1449,6 @@ class Set(parent: Byzer) extends BaseNode {
   override def getTag: Option[String] = _tag
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -1392,7 +1505,7 @@ case object SaveErrorIfExistsMode extends SaveMode {
   override def sql: String = "errorIfExists"
 }
 
-case class SaveMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class SaveMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                     _tableName: String,
                     _options: Map[String, OptionValue],
                     _format: Option[String],
@@ -1435,7 +1548,9 @@ class Save(parent: Byzer) extends BaseNode {
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(SaveMeta(_tag = _tag,
+    JSONTool.toJsonStr(SaveMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
@@ -1469,7 +1584,6 @@ class Save(parent: Byzer) extends BaseNode {
   }
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 
@@ -1495,12 +1609,11 @@ class Save(parent: Byzer) extends BaseNode {
   }
 
   override def toBlock: String = {
-    require(_isReady, "end is not called")
     s"""save ${_mode} ${_from} as ${_format.get}.`${_path.getOrElse("")}` ${_options.toFragment};"""
   }
 }
 
-case class PythonMeta(_tag: Option[String], _isReady: Boolean, _autogenTableName: String,
+case class PythonMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                       _tableName: String,
                       _options: Map[String, OptionValue],
                       _input: String,
@@ -1560,7 +1673,9 @@ class Python(parent: Byzer) extends BaseNode {
   }
 
   override def toJson: String = {
-    JSONTool.toJsonStr(PythonMeta(_tag = _tag,
+    JSONTool.toJsonStr(PythonMeta(
+      __meta = MetaMeta(getClass.getName),
+      _tag = _tag,
       _isReady = _isReady,
       _autogenTableName = _autogenTableName,
       _tableName = _tableName,
@@ -1636,7 +1751,6 @@ class Python(parent: Byzer) extends BaseNode {
   }
 
   override def tableName: String = {
-    require(_isReady, "end is not called")
     _tableName
   }
 

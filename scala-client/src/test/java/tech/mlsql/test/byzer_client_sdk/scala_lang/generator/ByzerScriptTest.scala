@@ -2,6 +2,7 @@ package tech.mlsql.test.byzer_client_sdk.scala_lang.generator
 
 import org.scalatest.funsuite.AnyFunSuite
 import tech.mlsql.byzer_client_sdk.scala_lang.generator._
+import tech.mlsql.common.utils.serder.json.JSONTool
 
 /**
  * 10/6/2022 WilliamZhu(allwefantasy@gmail.com)
@@ -231,6 +232,49 @@ class ByzerScriptTest extends AnyFunSuite {
 
     val t1 = byzer.getByTag("t1")
     println(t1.head.tableName)
+  }
+  
+  test("toJson") {
+    val byzer = Byzer()
+    val genCode = byzer.cluster.engine.url("http://127.0.0.1:9003/run/script").owner("jack").end.
+      backendStrategy(new JobNumAwareStrategy("")).
+      end.
+      load.format("csv").path("/tmp/jack").
+      options().add("header", "true").end.tag("table1").end.filter.
+      and.add(Or(Expr(Some("a>1")), Expr(Some("b>1")))).add(Expr(Some("c==1"))).end.end.
+      toJson(true)
+
+    println(genCode)
+
+    var byzer2 = Byzer()
+    byzer2 = byzer2.fromJson(genCode)
+    println(byzer2.toJson(true))
+  }
+
+  test("test") {
+    val s=
+      """
+        | {
+        |        "_clusters": [        {
+        |            "_url": "http://127.0.0.1:9003/run/script",
+        |            "_params": {},
+        |            "extraParams":             {
+        |                "sessionPerRequest": "true",
+        |                "sessionPerUser": "true",
+        |                "includeSchema": "true",
+        |                "executeMode": "query",
+        |                "fetchType": "take",
+        |                "owner": "jack"
+        |            }
+        |        }],
+        |        "refreshTime": 1,
+        |        "_backendStrategy":         {
+        |            "name": "jobNum",
+        |            "tags": ""
+        |        }
+        |     }""".stripMargin
+        println(JSONTool.toJsonStr(JSONTool.parseJson[ClusterMeta](s)))
+
   }
 
 }

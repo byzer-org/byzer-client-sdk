@@ -16,10 +16,42 @@ object Cluster {
   private[generator] val executor = Executors.newSingleThreadScheduledExecutor()
 }
 
+case class BackendStrategyMeta(name: String, tags: String)
+
+case class ClusterMeta(_clusters: List[EngineMeta],
+                       refreshTime: Long,
+                       _backendStrategy: Option[BackendStrategyMeta])
+
 class Cluster(parent: Byzer) {
-  private[generator] val _clusters = ArrayBuffer[Engine]()
+  private[generator] var _clusters = ArrayBuffer[Engine]()
   private[generator] var _refreshTime = 1l
   private[generator] var _backendStrategy: Option[BackendStrategy] = None
+
+  def fromJson(json: String): Cluster = {
+    val v = JSONTool.parseJson[ClusterMeta](json)
+    v._clusters.map { engineMeta =>
+      val engine = new Engine(parent, this)
+      engine._params = engineMeta._params
+      engine.extraParams ++= engineMeta.extraParams
+      engine._url = engineMeta._url
+      _clusters += engine
+    }
+    _refreshTime = v.refreshTime
+    _backendStrategy = v._backendStrategy.map { item =>
+      val strategy = item.name match {
+        case "all" => new AllBackendsStrategy(item.tags)
+        case "jobNum" => new JobNumAwareStrategy(item.tags)
+        case "resource" => new ResourceAwareStrategy(item.tags)
+      }
+      strategy
+    }
+    this
+  }
+
+  def toJson: String = {
+    val engineMetas = _clusters.map(_.toMeta)
+    JSONTool.toJsonStr(ClusterMeta(engineMetas.toList, _refreshTime, _backendStrategy.map(_.toMeta)))
+  }
 
   def engine = {
     val engine = new Engine(parent, this)
@@ -49,7 +81,7 @@ class Cluster(parent: Byzer) {
       override def run(): Unit = {
         _clusters.foreach { engine =>
           val resource = engine.showResource
-          engine._meta = EngineMeta(resource.activeTasks, resource.totalCores)
+          engine._meta = BackendMeta(resource.activeTasks, resource.totalCores)
         }
       }
     }, 1, _refreshTime, TimeUnit.SECONDS)
@@ -57,22 +89,30 @@ class Cluster(parent: Byzer) {
   }
 }
 
-case class EngineMeta(activeTaskNum: Long, totalCores: Long)
+case class BackendMeta(activeTaskNum: Long, totalCores: Long)
 
+case class EngineMeta(_url: String,
+                      _params: Map[String, String],
+                      extraParams: Map[String, String],
+                      _tag: Option[scala.collection.Set[String]])
 
 class Engine(parent: Byzer, cluster: Cluster) extends Logging {
-  private var _url = ""
-  private var _params: Map[String, String] = Map()
+  private[generator] var _url = ""
+  private[generator] var _params: Map[String, String] = Map()
   private[generator] var _tag: Option[scala.collection.Set[String]] = None
 
-  private[generator] var _meta = EngineMeta(-1, -1)
+  private[generator] var _meta = BackendMeta(-1, -1)
 
   def url(s: String) = {
     _url = s
     this
   }
 
-  private val extraParams = mutable.HashMap[String, String]()
+  def toMeta = {
+    EngineMeta(_url = _url, _params = _params, extraParams = extraParams.toMap, _tag = _tag)
+  }
+
+  private[generator] val extraParams = mutable.HashMap[String, String]()
   extraParams.put("executeMode", "query")
   extraParams.put("sessionPerUser", "true")
   extraParams.put("sessionPerRequest", "true")
@@ -204,10 +244,15 @@ class Engine(parent: Byzer, cluster: Cluster) extends Logging {
 }
 
 trait BackendStrategy {
+  def name: String
+
   def invoke(backends: Seq[Engine]): Option[Seq[Engine]]
+
+  def toMeta: BackendStrategyMeta
 }
 
 class AllBackendsStrategy(tags: String) extends BackendStrategy {
+
   override def invoke(backends: Seq[Engine]): Option[Seq[Engine]] = {
     val tagSet = tags.split(",").toSet
     if (tags.isEmpty) {
@@ -217,9 +262,18 @@ class AllBackendsStrategy(tags: String) extends BackendStrategy {
     }
 
   }
+
+  override def name: String = "all"
+
+  override def toMeta: BackendStrategyMeta = BackendStrategyMeta(name, tags)
 }
 
 class JobNumAwareStrategy(tags: String) extends BackendStrategy {
+
+  override def name: String = "jobNum"
+
+  override def toMeta: BackendStrategyMeta = BackendStrategyMeta(name, tags)
+
   override def invoke(backends: Seq[Engine]): Option[Seq[Engine]] = {
     val tagSet = tags.split(",").toSet
     var targetBackends = backends.filter(_._tag.isDefined)
@@ -236,6 +290,10 @@ class JobNumAwareStrategy(tags: String) extends BackendStrategy {
 }
 
 class ResourceAwareStrategy(tags: String) extends BackendStrategy with Logging {
+  override def toMeta: BackendStrategyMeta = BackendStrategyMeta(name, tags)
+
+  override def name: String = "resource"
+
   override def invoke(backends: Seq[Engine]): Option[Seq[Engine]] = {
 
     val tagSet = tags.split(",").toSet
