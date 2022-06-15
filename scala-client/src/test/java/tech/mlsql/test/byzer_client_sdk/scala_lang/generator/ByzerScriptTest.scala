@@ -265,8 +265,28 @@ class ByzerScriptTest extends AnyFunSuite {
     select_col.asInstanceOf[Columns].from(load_csv.tableName)
     filter.asInstanceOf[Filter].from(select_col.tableName)
 
-    val genCode = byzer.swapBlock(filter,select_col).toScript
-    
+    val genCode = byzer.swapBlock(filter, select_col).toScript
+
+    println(genCode)
+  }
+
+  /**
+   * load csv.`/tmp/jack` where `header`='''true''' as 58c451473da540e9bf097d8b59fe62d8;
+   * select * from 58c451473da540e9bf097d8b59fe62d8 where (a=b or (c>2 and d>10)) as ca0d5f002a5f4d1397658fd20bfa5f1a;
+   * select a,c,d from ca0d5f002a5f4d1397658fd20bfa5f1a as 7bd3418bdc4b4a2b9ea64ba6cbe9b03b;
+   * select * from 7bd3418bdc4b4a2b9ea64ba6cbe9b03b as newTable;
+   * select count(*) as c from newTable as 56d4a29f710a4e3cb6454ed568e29707;
+   */
+  test("raw") {
+    val byzer = Byzer().
+      load.format("csv").path("/tmp/jack").options().add("header", "true").end.tag("load_csv").end.
+      filter.or.add(Expr(Some("a=b"))).add(And(Expr(Some("c>2")), Expr(Some("d>10")))).end.tag("filter").end.
+      columns.addColumn(Expr(Some("a,c,d"))).tag("select_col").end
+    val lastTable = byzer.lastTableName
+    val genCode = byzer.raw.code(s"select * from ${lastTable} as newTable;").end.
+      columns.from("newTable").addColumn(Expr(Some("count(*) as c"))).end.
+      toScript
+
     println(genCode)
   }
 
