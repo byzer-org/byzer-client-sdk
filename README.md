@@ -49,12 +49,23 @@ val byzer = Byzer().cluster().
       backendStrategy(new ResourceAwareStrategy("")).
       end
 val script = byzer.variable.name(Expr(Some("data"))).value(Expr(Some(
-    """
-    |{ "x": 100, "y": 200, "z": 200 ,"dataType":"A group"}
-    |{ "x": 120, "y": 100, "z": 260 ,"dataType":"B group"}
-    |""".stripMargin))).end.load.format("jsonStr").path("data").namedTableName("table1").end
+      """
+        |{ "x": 100, "y": 200, "z": 200 ,"dataType":"A group"}
+        |{ "x": 120, "y": 100, "z": 260 ,"dataType":"B group"}
+        |""".stripMargin))).end.load.format("jsonStr").path("data").namedTableName("table1").tag("load_json").end.
+      columns.addColumn(Expr(Some("x"))).end
+
+// run all script
 val res = script.run()
 println(res.head.returnContent().asString())
+
+// Generate code unitl to statement with tag `load_json` and run it
+val res1 = script.runUntilTag("load_json")
+println(res1.head.returnContent().asString())
+
+// Only run statement with tag `xxxx`. 
+val res2 = script.runWithTag("xxxx")
+println(res2.head.returnContent().asString())
 ```
 
 

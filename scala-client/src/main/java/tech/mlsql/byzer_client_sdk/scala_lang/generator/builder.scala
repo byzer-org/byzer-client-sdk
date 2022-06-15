@@ -79,6 +79,12 @@ class Byzer {
     }
   }
 
+  def runWithTag(name:String) = {
+    _cluster.getMatchedEngines.map { engine =>
+      engine.runWithTag(name)
+    }
+  }
+
   def cluster() = {
     _cluster
   }
