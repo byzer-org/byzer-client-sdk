@@ -59,7 +59,7 @@ val script = byzer.variable.name(Expr(Some("data"))).value(Expr(Some(
 val res = script.run()
 println(res.head.returnContent().asString())
 
-// Generate code unitl to statement with tag `load_json` and run it
+// Generate code unitl the statement with tag `load_json` and run it
 val res1 = script.runUntilTag("load_json")
 println(res1.head.returnContent().asString())
 
