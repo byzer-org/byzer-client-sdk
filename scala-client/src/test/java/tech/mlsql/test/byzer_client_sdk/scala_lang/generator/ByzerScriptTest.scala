@@ -248,7 +248,7 @@ class ByzerScriptTest extends AnyFunSuite {
 
     var byzer2 = Byzer()
     byzer2 = byzer2.fromJson(genCode)
-    println(byzer2.toJson(true))
+    assert(byzer2.toJson(true) == genCode)
   }
 
   test("test") {
