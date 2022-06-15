@@ -72,7 +72,7 @@ println(res2.head.returnContent().asString())
 ## Tutorial
 
 1. [scala-client](./scala-client/README.md)
-2. java-client
+2. [java-client](./java-client/README.md)
 3. go-client
 4. rust-client
 5. typescript-client

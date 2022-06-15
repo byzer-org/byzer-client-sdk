@@ -1,2 +1,4 @@
 scala-client/target
 scala-client/.idea
+java-client/target
+java-client/.idea
