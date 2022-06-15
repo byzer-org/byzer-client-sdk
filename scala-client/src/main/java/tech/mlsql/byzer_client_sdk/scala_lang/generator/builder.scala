@@ -62,7 +62,7 @@ class Byzer {
 
   def getUntilTag(name: String): List[BaseNode] = {
     blocks.zipWithIndex.filter(_._1.getTag.isDefined).filter(_._1.getTag.get == name).headOption match {
-      case Some(item) => blocks.slice(item._2, blocks.size).toList
+      case Some(item) => blocks.slice(0, item._2 + 1).toList
       case None => List()
     }
   }
@@ -70,6 +70,12 @@ class Byzer {
   def run() = {
     _cluster.getMatchedEngines.map { engine =>
       engine.run()
+    }
+  }
+
+  def runUntilTag(name: String) = {
+    _cluster.getMatchedEngines.map { engine =>
+      engine.runUntilTag(name)
     }
   }
 
@@ -326,8 +332,10 @@ trait FilterNode {
 
 trait FilterNodeMeta {}
 
-case class AndFilterNodeMeta(k: String, left: FilterNodeMeta,right: FilterNodeMeta) extends FilterNodeMeta
-case class OrFilterNodeMeta(k: String, left: FilterNodeMeta,right: FilterNodeMeta) extends FilterNodeMeta
+case class AndFilterNodeMeta(k: String, left: FilterNodeMeta, right: FilterNodeMeta) extends FilterNodeMeta
+
+case class OrFilterNodeMeta(k: String, left: FilterNodeMeta, right: FilterNodeMeta) extends FilterNodeMeta
+
 case class ExprFilterNodeMeta(k: String, v: Expr) extends FilterNodeMeta
 
 case class And(left: FilterNode, right: FilterNode) extends FilterNode
@@ -432,12 +440,12 @@ class Filter(parent: Byzer) extends BaseNode {
     v match {
       case _ if v.isInstanceOf[And] =>
         val vv = v.asInstanceOf[And]
-        AndFilterNodeMeta("and",toFilterNodeMeta(vv.left),toFilterNodeMeta(vv.right))
+        AndFilterNodeMeta("and", toFilterNodeMeta(vv.left), toFilterNodeMeta(vv.right))
       case _ if v.isInstanceOf[Or] =>
         val vv = v.asInstanceOf[Or]
-        OrFilterNodeMeta("or",toFilterNodeMeta(vv.left),toFilterNodeMeta(vv.right))
+        OrFilterNodeMeta("or", toFilterNodeMeta(vv.left), toFilterNodeMeta(vv.right))
       case _ if v.isInstanceOf[Expr] =>
-        ExprFilterNodeMeta("expr",v.asInstanceOf[Expr])
+        ExprFilterNodeMeta("expr", v.asInstanceOf[Expr])
     }
   }
 

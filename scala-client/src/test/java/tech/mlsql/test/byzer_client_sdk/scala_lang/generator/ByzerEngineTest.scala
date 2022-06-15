@@ -16,8 +16,13 @@ class ByzerEngineTest extends AnyFunSuite {
       """
         |{ "x": 100, "y": 200, "z": 200 ,"dataType":"A group"}
         |{ "x": 120, "y": 100, "z": 260 ,"dataType":"B group"}
-        |""".stripMargin))).end.load.format("jsonStr").path("data").namedTableName("table1").end
+        |""".stripMargin))).end.load.format("jsonStr").path("data").namedTableName("table1").tag("load_json").end.
+      columns.addColumn(Expr(Some("x"))).end
     val res = script.run()
     println(res.head.returnContent().asString())
+
+    val res1 = script.runUntilTag("load_json")
+    println(res1.head.returnContent().asString())
   }
+
 }
