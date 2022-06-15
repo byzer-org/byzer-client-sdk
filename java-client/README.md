@@ -8,7 +8,7 @@ This is a simple java wrapper for [scala-sdk](https://github.com/allwefantasy/by
 <dependency>
     <groupId>tech.mlsql.byzer-client-sdk</groupId>
     <artifactId>java-client</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 </dependency>
 ```
 

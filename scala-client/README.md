@@ -8,7 +8,7 @@ Scala-client provides a scala-way to build and execute Byzer-lang code.
 <dependency>
     <groupId>tech.mlsql.byzer-client-sdk</groupId>
     <artifactId>scala-client_2.12</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 </dependency>
 ```
 
