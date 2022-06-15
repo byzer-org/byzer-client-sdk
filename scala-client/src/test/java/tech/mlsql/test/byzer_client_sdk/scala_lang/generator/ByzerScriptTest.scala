@@ -233,7 +233,7 @@ class ByzerScriptTest extends AnyFunSuite {
     val t1 = byzer.getByTag("t1")
     println(t1.head.tableName)
   }
-  
+
   test("toJson") {
     val byzer = Byzer()
     val genCode = byzer.cluster.engine.url("http://127.0.0.1:9003/run/script").owner("jack").end.
@@ -251,8 +251,27 @@ class ByzerScriptTest extends AnyFunSuite {
     assert(byzer2.toJson(true) == genCode)
   }
 
+  test("swap") {
+    val byzer = Byzer().
+      load.format("csv").path("/tmp/jack").options().add("header", "true").end.tag("load_csv").end.
+      filter.or.add(Expr(Some("a=b"))).add(And(Expr(Some("c>2")), Expr(Some("d>10")))).end.tag("filter").end.
+      columns.addColumn(Expr(Some("a,c,d"))).tag("select_col").end
+
+    val load_csv = byzer.getByTag("load_csv").head
+    val filter = byzer.getByTag("filter").head
+    val select_col = byzer.getByTag("select_col").head
+
+    // replace the from table
+    select_col.asInstanceOf[Columns].from(load_csv.tableName)
+    filter.asInstanceOf[Filter].from(select_col.tableName)
+
+    val genCode = byzer.swapBlock(filter,select_col).toScript
+    
+    println(genCode)
+  }
+
   test("test") {
-    val s=
+    val s =
       """
         | {
         |        "_clusters": [        {
@@ -273,7 +292,7 @@ class ByzerScriptTest extends AnyFunSuite {
         |            "tags": ""
         |        }
         |     }""".stripMargin
-        println(JSONTool.toJsonStr(JSONTool.parseJson[ClusterMeta](s)))
+    println(JSONTool.toJsonStr(JSONTool.parseJson[ClusterMeta](s)))
 
   }
 

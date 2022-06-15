@@ -24,7 +24,7 @@ object Byzer {
 }
 
 class Byzer {
-  private val blocks = new ArrayBuffer[BaseNode]()
+  private var blocks = new ArrayBuffer[BaseNode]()
   private var _cluster = new Cluster(this)
 
   def toJson(pretty: Boolean = false) = {
@@ -56,6 +56,30 @@ class Byzer {
     this
   }
 
+  def removeByTag(name: String) = {
+    blocks = blocks.dropWhile(item => item.getTag.isDefined && item.getTag.get == name)
+    this
+  }
+
+  def swapBlock(a: BaseNode, b: BaseNode) = {
+    val newBlocks = ArrayBuffer[BaseNode]()
+
+    val acIndex = blocks.indexOf(a)
+    val bcIndex = blocks.indexOf(b)
+
+    blocks.zipWithIndex.foreach { item =>
+      if (item._2 == acIndex) {
+        newBlocks.insert(item._2, b)
+      } else if (item._2 == bcIndex) {
+        newBlocks.insert(item._2, a)
+      } else {
+        newBlocks.insert(item._2, item._1)
+      }
+    }
+    blocks = newBlocks
+    this
+  }
+
   def getByTag(name: String): List[BaseNode] = {
     blocks.filter(_.getTag.isDefined).filter(_.getTag.get == name).toList
   }
@@ -79,7 +103,7 @@ class Byzer {
     }
   }
 
-  def runWithTag(name:String) = {
+  def runWithTag(name: String) = {
     _cluster.getMatchedEngines.map { engine =>
       engine.runWithTag(name)
     }
