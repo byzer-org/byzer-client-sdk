@@ -21,32 +21,31 @@ object Byzer {
 
 class Commands(byzer: Byzer) {
 
-  private def singleCheck = {
-    require(byzer.blocks.isEmpty, "Please make sure there is no other script.")
-  }
-
   def showResource = {
-    singleCheck
     val r = _inner[Res[ResResource]]("!show resource;")
     r.data
   }
 
   private def _inner[T](command: String)(implicit mt: Manifest[T]) = {
-    try {
-      val str = byzer.raw.code(command).end.run().head.returnContent().asString()
-      val res = JsonUtils.fromJson[T](str)
-      res
-    } finally {
-      byzer.dropLast
-    }
+    val str = byzer.runSQL(command).head.returnContent().asString()
+    val res = JsonUtils.fromJson[T](str)
+    res
   }
 
   def showJobs = {
-    singleCheck
     val r = _inner[Res[ResJobInfo]]("!show jobs;")
     r.data
   }
 
+  def showJobProgress(jobName: String) = {
+    val r = _inner[Res[ResJobDetail]](s"!show jobs/v2/${jobName};")
+    r.data
+  }
+
+  def showVersion = {
+    val r = _inner[Res[ResVersion]](s"!show version;")
+    r.data
+  }
 
   def schema = {
     val tableName = byzer.lastTableName
@@ -139,6 +138,12 @@ class Byzer {
     blocks.zipWithIndex.filter(_._1.getTag.isDefined).filter(_._1.getTag.get == name).headOption match {
       case Some(item) => blocks.slice(0, item._2 + 1).toList
       case None => List()
+    }
+  }
+
+  def runSQL(sql: String) = {
+    _cluster.getMatchedEngines.map { engine =>
+      engine.runSQL(sql)
     }
   }
 

@@ -19,8 +19,8 @@ class ByzerEngineTest extends AnyFunSuite {
         |""".stripMargin))).end.load.format("jsonStr").path("data").namedTableName("table1").tag("load_json").end.
       columns.addColumn(Expr(Some("x"))).end
 
-//    println(script.schema)
-    println(script.commands.showResource)
+    println(script.commands.schema)
+    println(byzer.commands.showVersion)
 
 //    val res = script.run()
 //    println(res.head.returnContent().asString())

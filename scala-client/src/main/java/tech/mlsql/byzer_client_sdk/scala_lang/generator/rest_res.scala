@@ -15,6 +15,7 @@ case class ResShufflePerf(
                            inputRecords: Long
 
                          )
+
 case class ResResource(
                         currentJobGroupActiveTasks: Int,
                         activeTasks: Int,
@@ -30,14 +31,44 @@ case class ResResource(
                         totalMemory: Double,
                         shuffleData: ResShufflePerf
                       )
+
 case class ResJobProgress(var totalJob: Long = 0, var currentJobIndex: Long = 0, var script: String = "")
+
 case class ResJobInfo(
-                         owner: String,
-                         jobType: String,
-                         jobName: String,
-                         jobContent: String,
-                         groupId: String,
-                         progress: ResJobProgress,
-                         startTime: Long,
-                         timeout: Long
+                       owner: String,
+                       jobType: String,
+                       jobName: String,
+                       jobContent: String,
+                       groupId: String,
+                       progress: ResJobProgress,
+                       startTime: Long,
+                       timeout: Long
+                     )
+
+case class ResJobDetail(
+                         val jobId: Int,
+                         val submissionTime: Option[java.sql.Date],
+                         val completionTime: Option[java.sql.Date],
+                         val numTasks: Int,
+                         val numActiveTasks: Int,
+                         val numCompletedTasks: Int,
+                         val numSkippedTasks: Int,
+                         val numFailedTasks: Int,
+                         val numKilledTasks: Int,
+                         val numCompletedIndices: Int,
+                         val numActiveStages: Int,
+                         val numCompletedStages: Int,
+                         val numSkippedStages: Int,
+                         val numFailedStages: Int,
+                         val duration: Long
                        )
+
+case class ResVersion(version: String,
+                      buildBy: String,
+                      date: String,
+                      srcChecksum: String,
+                      revision: String,
+                      branch: String,
+                      url: String,
+                      core: String
+                     )
