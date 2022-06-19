@@ -68,6 +68,29 @@ val res2 = script.runWithTag("xxxx")
 println(res2.head.returnContent().asString())
 ```
 
+## commands 
+
+```scala
+val byzer = Byzer().cluster().
+engine.url("http://127.0.0.1:9004/run/script").owner("admin").end.
+backendStrategy(new ResourceAwareStrategy("")).
+end
+val script = byzer.variable.name(Expr(Some("data"))).value(Expr(Some(
+"""
+      |{ "x": 100, "y": 200, "z": 200 ,"dataType":"A group"}
+      |{ "x": 120, "y": 100, "z": 260 ,"dataType":"B group"}
+      |""".stripMargin))).end.load.format("jsonStr").path("data").namedTableName("table1").tag("load_json").end.
+columns.addColumn(Expr(Some("x"))).end
+
+
+println(script.commands.schema)
+
+println(byzer.commands.showVersion)
+
+println(byzer.commands.showResource)
+
+println(byzer.commands.showJobs)
+```
 
 ## Tutorial
 
