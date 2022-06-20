@@ -20,7 +20,8 @@ class ByzerEngineTest extends AnyFunSuite {
       columns.addColumn(Expr(Some("x"))).end
 
     println(script.commands.schema)
-    println(byzer.commands.showVersion)
+    println(byzer.commands.showDataSourceParam("csv"))
+    println(byzer.commands.showETs)
 
 //    val res = script.run()
 //    println(res.head.returnContent().asString())

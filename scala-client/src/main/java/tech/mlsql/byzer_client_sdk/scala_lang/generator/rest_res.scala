@@ -72,3 +72,13 @@ case class ResVersion(version: String,
                       url: String,
                       core: String
                      )
+
+case class ResDataSource(name: String)
+
+case class ResDataSourceParam(param: String, description: String, value: String, extra: String)
+
+case class ResET(name: String, algType: String, sparkCompatibility: String, doc: String, docType: String)
+
+case class ResETParam(param: String, description: String, value: String, extra: String)
+
+case class ResTable(database: String, tableName: String, isTemporary: Boolean)

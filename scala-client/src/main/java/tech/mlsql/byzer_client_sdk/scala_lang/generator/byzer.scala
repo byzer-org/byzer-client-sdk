@@ -47,6 +47,36 @@ class Commands(byzer: Byzer) {
     r.data
   }
 
+  def showDataSources = {
+    val r = _inner[Res[ResDataSource]](s"!show datasources;")
+    r.data
+  }
+
+  def showDataSourceParam(name:String) = {
+    val r = _inner[Res[ResDataSourceParam]](s"!show datasources/params/${name};")
+    r.data
+  }
+
+  def showETs = {
+    val r = _inner[Res[ResET]](s"!show et;")
+    r.data
+  }
+
+  def showETParam(name:String) = {
+    val r = _inner[Res[ResETParam]](s"!show et/params/${name};")
+    r.data
+  }
+
+  def showTables = {
+    val r = _inner[Res[ResTable]](s"!show tables;")
+    r.data
+  }
+
+  def showTablesFromDB(db:String) = {
+    val r = _inner[Res[ResTable]](s"!show tables from ${db};")
+    r.data
+  }
+  
   def schema = {
     val tableName = byzer.lastTableName
     try {
