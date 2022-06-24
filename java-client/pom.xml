@@ -6,7 +6,7 @@
 
     <groupId>tech.mlsql.byzer-client-sdk</groupId>
     <artifactId>java-client</artifactId>
-    <version>0.0.2</version>
+    <version>0.0.3</version>
 
     <name>Byzer client sdk</name>
     <url>https://github.com/allwefantasy/byzer-client-sdk</url>
@@ -67,7 +67,14 @@
         <dependency>
             <groupId>tech.mlsql.byzer-client-sdk</groupId>
             <artifactId>scala-client_${scala.binary.version}</artifactId>
-            <version>0.0.2</version>
+            <version>0.0.3</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.8.2</version>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>
