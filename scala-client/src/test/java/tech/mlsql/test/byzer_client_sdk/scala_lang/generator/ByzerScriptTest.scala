@@ -66,11 +66,12 @@ class ByzerScriptTest extends AnyFunSuite {
   }
 
   /**
-   * load csv.`/tmp/jack` where `header`='''true''' as e7a9b351064b4cd399b819defbfbf5f0;
-   * load csv.`/tmp/william` where `header`='''true''' as 8c6f1d82e75a4d61baf31924c55c845a;
-   * select e7a9b351064b4cd399b819defbfbf5f0.a,e7a9b351064b4cd399b819defbfbf5f0.c,8c6f1d82e75a4d61baf31924c55c845a.m
-   * from e7a9b351064b4cd399b819defbfbf5f0 LEFT OUTER 8c6f1d82e75a4d61baf31924c55c845a
-   * on e7a9b351064b4cd399b819defbfbf5f0.a=8c6f1d82e75a4d61baf31924c55c845a.b;
+   * load csv.`/tmp/jack` where `header`='''true''' as ab2e364a24ea4f50b7ac8010772a67b8;
+   * load csv.`/tmp/william` where `header`='''true''' as 649a1142023349c7b19f9b265855b8dd;
+   * select ab2e364a24ea4f50b7ac8010772a67b8.a,ab2e364a24ea4f50b7ac8010772a67b8.c,649a1142023349c7b19f9b265855b8dd.m
+   * from ab2e364a24ea4f50b7ac8010772a67b8 LEFT OUTER 649a1142023349c7b19f9b265855b8dd
+   * on (ab2e364a24ea4f50b7ac8010772a67b8.a=649a1142023349c7b19f9b265855b8dd.b
+   * and ab2e364a24ea4f50b7ac8010772a67b8.a=649a1142023349c7b19f9b265855b8dd.c);
    */
   test("join") {
     val byzer = Byzer()
@@ -85,11 +86,33 @@ class ByzerScriptTest extends AnyFunSuite {
     val genCode = byzer.join.
       from(Expr(Some(t1))).
       left(Expr(Some(t2))).
-      on(Expr(Some(s"""${t1}.a=${t2}.b"""))).
+      on_and.add(Expr(Some(s"""${t1}.a=${t2}.b"""))).add(Expr(Some(s"""${t1}.a=${t2}.c"""))).end.
       leftColumns(Expr(Some(s"${t1}.a,${t1}.c"))).
       rightColumns(Expr(Some(s"""${t2}.m"""))).end.toScript
 
     println(genCode)
+  }
+
+  test("join-serder") {
+    val byzer = Byzer()
+    val table1 = byzer.load.format("csv").path("/tmp/jack").options().add("header", "true").end
+    val table2 = byzer.load.format("csv").path("/tmp/william").options().add("header", "true").end
+    table1.end
+    table2.end
+
+    val t1 = table1.tableName
+    val t2 = table2.tableName
+
+    val f = byzer.join.
+      from(Expr(Some(t1))).
+      left(Expr(Some(t2))).
+      on_and.add(Expr(Some(s"""${t1}.a=${t2}.b"""))).add(Expr(Some(s"""${t1}.a=${t2}.c"""))).end.
+      leftColumns(Expr(Some(s"${t1}.a,${t1}.c"))).
+      rightColumns(Expr(Some(s"""${t2}.m"""))).end
+    println(f.toJson(true))
+    val v = Byzer().fromJson(f.toJson())
+
+    println(v.toScript)
   }
 
   /**

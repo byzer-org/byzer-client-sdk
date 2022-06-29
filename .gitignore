@@ -2,3 +2,7 @@ scala-client/target
 scala-client/.idea
 java-client/target
 java-client/.idea
+python-client/target
+python-client/.idea
+python-client/publish.sh
+python-client/.vscode

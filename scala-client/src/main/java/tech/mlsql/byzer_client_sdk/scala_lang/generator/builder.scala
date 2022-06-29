@@ -371,10 +371,42 @@ trait BaseOpt {
   def toFilterNode: FilterNode
 }
 
+object AndOrTools {
+  def toFilterNode(json: JSONObject): FilterNode = {
+
+    json.getString("k") match {
+      case "or" =>
+        val left = json.getJSONObject("left")
+        val right = json.getJSONObject("right")
+        Or(toFilterNode(left), toFilterNode(right))
+      case "and" =>
+        val left = json.getJSONObject("left")
+        val right = json.getJSONObject("right")
+        And(toFilterNode(left), toFilterNode(right))
+      case "expr" =>
+        val v = json.getJSONObject("v")
+        Expr(Some(v.getString("expr")))
+    }
+  }
+
+  def toFilterNodeMeta(v: FilterNode): FilterNodeMeta = {
+    v match {
+      case _ if v.isInstanceOf[And] =>
+        val vv = v.asInstanceOf[And]
+        AndFilterNodeMeta("and", toFilterNodeMeta(vv.left), toFilterNodeMeta(vv.right))
+      case _ if v.isInstanceOf[Or] =>
+        val vv = v.asInstanceOf[Or]
+        OrFilterNodeMeta("or", toFilterNodeMeta(vv.left), toFilterNodeMeta(vv.right))
+      case _ if v.isInstanceOf[Expr] =>
+        ExprFilterNodeMeta("expr", v.asInstanceOf[Expr])
+    }
+  }
+}
+
 case class AndOrOptMeta(__meta: MetaMeta, _clauses: List[FilterNodeMeta])
 
 
-class AndOpt(parent: Filter) extends BaseOpt {
+class AndOpt[T <: BaseNode](parent: T) extends BaseOpt {
 
   private var _isReady = false
   private[generator] val _clauses = ArrayBuffer[FilterNode]()
@@ -385,7 +417,7 @@ class AndOpt(parent: Filter) extends BaseOpt {
     this
   }
 
-  def end: Filter = {
+  def end: T = {
     _isReady = true
     parent
   }
@@ -396,7 +428,7 @@ class AndOpt(parent: Filter) extends BaseOpt {
   }
 }
 
-class OrOpt(parent: Filter) extends BaseOpt {
+class OrOpt[T <: BaseNode](parent: T) extends BaseOpt {
 
   private var _isReady = false
   private val _autogenTableName = UUID.randomUUID().toString.replaceAll("-", "")
@@ -413,14 +445,14 @@ class OrOpt(parent: Filter) extends BaseOpt {
     _tableName
   }
 
-  def namedTableName(tableName: String): OrOpt = {
+  def namedTableName(tableName: String): OrOpt[T] = {
     _tableName = tableName
     this
   }
 
   def desc(str: String): BaseNode = ???
 
-  def end: Filter = {
+  def end: T = {
     _isReady = true
     parent
   }
@@ -442,35 +474,6 @@ class Filter(parent: Byzer) extends BaseNode {
   private var _clauses = ArrayBuffer[BaseOpt]()
   private var _from = parent.lastTableName
 
-  private def toFilterNode(json: JSONObject): FilterNode = {
-
-    json.getString("k") match {
-      case "or" =>
-        val left = json.getJSONObject("left")
-        val right = json.getJSONObject("right")
-        Or(toFilterNode(left), toFilterNode(right))
-      case "and" =>
-        val left = json.getJSONObject("left")
-        val right = json.getJSONObject("right")
-        And(toFilterNode(left), toFilterNode(right))
-      case "expr" =>
-        val v = json.getJSONObject("v")
-        Expr(Some(v.getString("expr")))
-    }
-  }
-
-  private def toFilterNodeMeta(v: FilterNode): FilterNodeMeta = {
-    v match {
-      case _ if v.isInstanceOf[And] =>
-        val vv = v.asInstanceOf[And]
-        AndFilterNodeMeta("and", toFilterNodeMeta(vv.left), toFilterNodeMeta(vv.right))
-      case _ if v.isInstanceOf[Or] =>
-        val vv = v.asInstanceOf[Or]
-        OrFilterNodeMeta("or", toFilterNodeMeta(vv.left), toFilterNodeMeta(vv.right))
-      case _ if v.isInstanceOf[Expr] =>
-        ExprFilterNodeMeta("expr", v.asInstanceOf[Expr])
-    }
-  }
 
   override def fromJson(json: String): BaseNode = {
     val obj = JSONObject.fromObject(json)
@@ -479,18 +482,18 @@ class Filter(parent: Byzer) extends BaseNode {
     clauseTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
       val t = item.asInstanceOf[JSONObject]
       val opt = Class.forName(t.getJSONObject("__meta").getString("name")).
-        getConstructor(classOf[Filter]).
+        getConstructor(classOf[BaseNode]).
         newInstance(this).asInstanceOf[BaseOpt]
       opt match {
-        case _ if opt.isInstanceOf[AndOpt] =>
-          val andOpt = opt.asInstanceOf[AndOpt]
+        case _ if opt.isInstanceOf[AndOpt[Filter]] =>
+          val andOpt = opt.asInstanceOf[AndOpt[Filter]]
           t.getJSONArray("_clauses").asScala.map { t =>
-            andOpt.add(toFilterNode(t.asInstanceOf[JSONObject]))
+            andOpt.add(AndOrTools.toFilterNode(t.asInstanceOf[JSONObject]))
           }
-        case _ if opt.isInstanceOf[OrOpt] =>
-          val orOpt = opt.asInstanceOf[AndOpt]
+        case _ if opt.isInstanceOf[OrOpt[Filter]] =>
+          val orOpt = opt.asInstanceOf[OrOpt[Filter]]
           t.getJSONArray("_clauses").asScala.map { t =>
-            orOpt.add(toFilterNode(t.asInstanceOf[JSONObject]))
+            orOpt.add(AndOrTools.toFilterNode(t.asInstanceOf[JSONObject]))
           }
       }
       _clauses += opt
@@ -509,13 +512,13 @@ class Filter(parent: Byzer) extends BaseNode {
 
     val clauses = _clauses.map { item =>
       item match {
-        case _ if item.isInstanceOf[AndOpt] =>
-          AndOrOptMeta(MetaMeta(classOf[AndOpt].getName), item.asInstanceOf[AndOpt]._clauses.map { t =>
-            toFilterNodeMeta(t)
+        case _ if item.isInstanceOf[AndOpt[Filter]] =>
+          AndOrOptMeta(MetaMeta(classOf[AndOpt[Filter]].getName), item.asInstanceOf[AndOpt[Filter]]._clauses.map { t =>
+            AndOrTools.toFilterNodeMeta(t)
           }.toList)
-        case _ if item.isInstanceOf[OrOpt] =>
-          AndOrOptMeta(MetaMeta(classOf[OrOpt].getName), item.asInstanceOf[OrOpt]._clauses.map { t =>
-            toFilterNodeMeta(t)
+        case _ if item.isInstanceOf[OrOpt[Filter]] =>
+          AndOrOptMeta(MetaMeta(classOf[OrOpt[Filter]].getName), item.asInstanceOf[OrOpt[Filter]]._clauses.map { t =>
+            AndOrTools.toFilterNodeMeta(t)
           }.toList)
       }
     }
@@ -531,13 +534,13 @@ class Filter(parent: Byzer) extends BaseNode {
     ))
   }
 
-  def or(): OrOpt = {
+  def or(): OrOpt[Filter] = {
     val n = new OrOpt(this)
     _clauses += n
     n
   }
 
-  def and(): AndOpt = {
+  def and(): AndOpt[Filter] = {
     val n = new AndOpt(this)
     _clauses += n
     n
@@ -664,7 +667,7 @@ class Columns(parent: Byzer) extends BaseNode {
 case class JoinMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                     _tableName: String, _from: String,
                     _joinTable: Option[String],
-                    _on: Option[String],
+                    _on:Option[List[AndOrOptMeta]],
                     _leftColumns: Option[String], _rightColumns: Option[String])
 
 class Join(parent: Byzer) extends BaseNode {
@@ -676,25 +679,62 @@ class Join(parent: Byzer) extends BaseNode {
   private var _from = parent.lastTableName
 
   private var _joinTable: Option[String] = None
-  private var _on: Option[String] = None
+  private var _on = ArrayBuffer[BaseOpt]()
   private var _leftColumns: Option[String] = None
   private var _rightColumns: Option[String] = None
 
   override def fromJson(json: String): BaseNode = {
-    val v = JSONTool.parseJson[JoinMeta](json)
+
+    val obj = JSONObject.fromObject(json)
+    val clauseTemp = obj.remove("_on")
+
+    clauseTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
+      val t = item.asInstanceOf[JSONObject]
+      val opt = Class.forName(t.getJSONObject("__meta").getString("name")).
+        getConstructor(classOf[BaseNode]).
+        newInstance(this).asInstanceOf[BaseOpt]
+      opt match {
+        case _ if opt.isInstanceOf[AndOpt[Join]] =>
+          val andOpt = opt.asInstanceOf[AndOpt[Join]]
+          t.getJSONArray("_clauses").asScala.map { t =>
+            andOpt.add(AndOrTools.toFilterNode(t.asInstanceOf[JSONObject]))
+          }
+        case _ if opt.isInstanceOf[OrOpt[Join]] =>
+          val orOpt = opt.asInstanceOf[AndOpt[Join]]
+          t.getJSONArray("_clauses").asScala.map { t =>
+            orOpt.add(AndOrTools.toFilterNode(t.asInstanceOf[JSONObject]))
+          }
+      }
+      _on += opt
+    }
+
+    val v = JSONTool.parseJson[JoinMeta](obj.toString)
     _tag = v._tag
     _isReady = v._isReady
     _autogenTableName = v._autogenTableName
     _tableName = v._tableName
     _from = v._from
     _joinTable = v._joinTable
-    _on = v._on
     _leftColumns = v._leftColumns
     _rightColumns = v._rightColumns
     this
   }
 
   override def toJson: String = {
+
+    val clauses = _on.map { item =>
+      item match {
+        case _ if item.isInstanceOf[AndOpt[Join]] =>
+          AndOrOptMeta(MetaMeta(classOf[AndOpt[Join]].getName), item.asInstanceOf[AndOpt[Join]]._clauses.map { t =>
+            AndOrTools.toFilterNodeMeta(t)
+          }.toList)
+        case _ if item.isInstanceOf[OrOpt[Join]] =>
+          AndOrOptMeta(MetaMeta(classOf[OrOpt[Join]].getName), item.asInstanceOf[OrOpt[Join]]._clauses.map { t =>
+            AndOrTools.toFilterNodeMeta(t)
+          }.toList)
+      }
+    }
+
     JSONTool.toJsonStr(JoinMeta(
       __meta = MetaMeta(getClass.getName),
       _tag = _tag,
@@ -703,7 +743,7 @@ class Join(parent: Byzer) extends BaseNode {
       _tableName = _tableName,
       _from = _from,
       _joinTable = _joinTable,
-      _on = _on,
+      _on = Some(clauses.toList),
       _leftColumns = _leftColumns,
       _rightColumns = _rightColumns,
     ))
@@ -740,7 +780,8 @@ class Join(parent: Byzer) extends BaseNode {
   override def options(): Options = ???
 
   override def toBlock: String = {
-    s"""select ${_leftColumns.get},${_rightColumns.get} from ${_from} ${_joinTable.get} on ${_on.get};"""
+    val cla = _on.map { cla => cla.toFilterNode.toFragment }.mkString(" and ")
+    s"""select ${_leftColumns.get},${_rightColumns.get} from ${_from} ${_joinTable.get} on ${cla};"""
   }
 
 
@@ -754,9 +795,16 @@ class Join(parent: Byzer) extends BaseNode {
     this
   }
 
-  def on(expr: Expr) = {
-    _on = Some(expr.toFragment)
-    this
+  def on_or(): OrOpt[Join] = {
+    val n = new OrOpt(this)
+    _on += n
+    n
+  }
+
+  def on_and(): AndOpt[Join] = {
+    val n = new AndOpt(this)
+    _on += n
+    n
   }
 
   def left(expr: Expr) = {

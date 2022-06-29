@@ -22,6 +22,7 @@ class ByzerEngineTest extends AnyFunSuite {
     println(script.commands.schema)
     println(byzer.commands.showDataSourceParam("csv"))
     println(byzer.commands.showETs)
+    println(1+2)
 
 //    val res = script.run()
 //    println(res.head.returnContent().asString())
