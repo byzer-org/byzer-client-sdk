@@ -71,7 +71,8 @@ class ByzerScriptTest extends AnyFunSuite {
    * select ab2e364a24ea4f50b7ac8010772a67b8.a,ab2e364a24ea4f50b7ac8010772a67b8.c,649a1142023349c7b19f9b265855b8dd.m
    * from ab2e364a24ea4f50b7ac8010772a67b8 LEFT OUTER 649a1142023349c7b19f9b265855b8dd
    * on (ab2e364a24ea4f50b7ac8010772a67b8.a=649a1142023349c7b19f9b265855b8dd.b
-   * and ab2e364a24ea4f50b7ac8010772a67b8.a=649a1142023349c7b19f9b265855b8dd.c);
+   * and ab2e364a24ea4f50b7ac8010772a67b8.a=649a1142023349c7b19f9b265855b8dd.c)
+   * as 73dfaeda7b3241bf8527fe073ea4d0e9;
    */
   test("join") {
     val byzer = Byzer()
