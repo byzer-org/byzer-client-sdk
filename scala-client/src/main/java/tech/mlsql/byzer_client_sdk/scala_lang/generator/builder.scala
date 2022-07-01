@@ -781,7 +781,7 @@ class Join(parent: Byzer) extends BaseNode {
 
   override def toBlock: String = {
     val cla = _on.map { cla => cla.toFilterNode.toFragment }.mkString(" and ")
-    s"""select ${_leftColumns.get},${_rightColumns.get} from ${_from} ${_joinTable.get} on ${cla};"""
+    s"""select ${_leftColumns.get},${_rightColumns.get} from ${_from} ${_joinTable.get} on ${cla} as ${_tableName};"""
   }
 
 
