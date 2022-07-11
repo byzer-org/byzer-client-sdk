@@ -177,9 +177,9 @@ class ByzerScriptTest extends AnyFunSuite {
 
     val f = byzer.join.
       from(Expr(Some(t1))).
+      leftColumns(Expr(Some(s"${t1}.a,${t1}.c"))).
       left(Expr(Some(t2))).
       on_and.add(Expr(Some(s"""${t1}.a=${t2}.b"""))).add(Expr(Some(s"""${t1}.a=${t2}.c"""))).end.
-      leftColumns(Expr(Some(s"${t1}.a,${t1}.c"))).
       rightColumns(Expr(Some(s"""${t2}.m"""))).
       right(Expr(Some(t3))).
       on_and.add(Expr(Some(s"""${t1}.a=${t3}.d"""))).add(Expr(Some(s"""${t1}.a=${t3}.e"""))).end.
@@ -187,7 +187,6 @@ class ByzerScriptTest extends AnyFunSuite {
       .namedTableName("joinTable").end
 
     val jsonStr = f.toJson(true)
-    println(jsonStr)
 
     val byzerV2 = Byzer().fromJson(f.toJson())
 
@@ -195,12 +194,14 @@ class ByzerScriptTest extends AnyFunSuite {
     val expectScript = """load csv.`/tmp/jack` where `header`='''true''' as table1;
                          |load csv.`/tmp/william` where `header`='''true''' as table2;
                          |load csv.`/tmp/admond` where `header`='''true''' as table3;
-                         |select table1.a,table1.c,LEFT OUTER JOIN table2,RIGHT OUTER JOIN table3
+                         |select table1.a,table1.c,table2.m,table3.n
                          |from table1
                          |LEFT OUTER JOIN table2 on (table1.a=table2.b and table1.a=table2.c)
                          |RIGHT OUTER JOIN table3 on (table1.a=table3.d and table1.a=table3.e)
                          |as joinTable;""".stripMargin
     assert(script == expectScript)
+    assert(script == byzer.toScript)
+    println(script)
   }
 
   /**

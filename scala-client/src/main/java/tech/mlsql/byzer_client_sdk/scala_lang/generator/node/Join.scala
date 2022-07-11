@@ -129,7 +129,7 @@ class Join(parent: Byzer) extends BaseNode {
     }
 
     val rightColumnsTemp = obj.remove("_rightColumns")
-    joinTableTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
+    rightColumnsTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
       val itemStr = item.asInstanceOf[String]
       _rightColumns += Some(itemStr)
     }
