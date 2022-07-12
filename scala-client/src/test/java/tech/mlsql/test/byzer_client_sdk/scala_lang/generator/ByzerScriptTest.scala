@@ -186,8 +186,6 @@ class ByzerScriptTest extends AnyFunSuite {
       rightColumns(Expr(Some(s"""${t3}.n""")))
       .namedTableName("joinTable").end
 
-    val jsonStr = f.toJson(true)
-
     val byzerV2 = Byzer().fromJson(f.toJson())
 
     val script = byzerV2.toScript
