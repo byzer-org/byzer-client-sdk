@@ -432,4 +432,12 @@ class ByzerScriptTest extends AnyFunSuite {
     val expected = "select a,c,d from table1 as table2;"
     assert(expected.equals(actual))
   }
+
+  test("first_node_without_from") {
+    assertThrows[RuntimeException]{
+      val byzer = Byzer().
+        columns.addColumn(Expr(Some("a,c,d"))).namedTableName("table2").end
+      byzer.toScript
+    }
+  }
 }
