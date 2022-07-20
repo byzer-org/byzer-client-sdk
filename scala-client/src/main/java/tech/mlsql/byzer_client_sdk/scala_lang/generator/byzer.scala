@@ -277,7 +277,12 @@ class Byzer {
   }
 
   def lastTableName = {
-    blocks.last.tableName
+    val tableName: String = if (blocks.isEmpty){
+      ""
+    } else {
+      blocks.last.tableName
+    }
+    tableName
   }
 
 }
