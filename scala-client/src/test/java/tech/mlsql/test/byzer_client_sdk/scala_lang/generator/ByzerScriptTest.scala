@@ -423,7 +423,11 @@ class ByzerScriptTest extends AnyFunSuite {
         |        }
         |     }""".stripMargin
     println(JSONTool.toJsonStr(JSONTool.parseJson[ClusterMeta](s)))
-
   }
 
+  test("first_node") {
+    val byzer = Byzer().
+      columns.from("table1").addColumn(Expr(Some("a,c,d"))).namedTableName("table2").end
+    println(byzer.toScript)
+  }
 }
