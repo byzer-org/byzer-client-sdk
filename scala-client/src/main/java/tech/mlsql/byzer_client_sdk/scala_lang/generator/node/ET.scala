@@ -111,6 +111,8 @@ class ET(parent: Byzer) extends BaseNode {
   }
 
   override def end: Byzer = {
+    if (parent.blocks.size == 1 && _from.isEmpty)
+      throw new RuntimeException("First Node must call def from()!")
     _isReady = true
     parent
   }
