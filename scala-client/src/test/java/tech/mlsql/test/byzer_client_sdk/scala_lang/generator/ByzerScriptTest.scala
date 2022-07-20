@@ -428,6 +428,8 @@ class ByzerScriptTest extends AnyFunSuite {
   test("first_node") {
     val byzer = Byzer().
       columns.from("table1").addColumn(Expr(Some("a,c,d"))).namedTableName("table2").end
-    println(byzer.toScript)
+    val actual = byzer.toScript
+    val expected = "select a,c,d from table1 as table2;"
+    assert(expected.equals(actual))
   }
 }
