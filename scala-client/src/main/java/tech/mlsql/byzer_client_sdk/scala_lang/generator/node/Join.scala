@@ -76,7 +76,7 @@ object LeftSemiOrAnti {
 case class JoinMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                     _tableName: String, _from: String,
                     _joinTable: List[Option[String]],
-                    _on:Option[List[AndOrOptMeta]],
+                    _on: Option[List[AndOrOptMeta]],
                     _leftColumns: Option[String], _rightColumns: List[Option[String]])
 
 /**
@@ -210,24 +210,28 @@ class Join(parent: Byzer) extends BaseNode {
     }
 
     var joinClause: ArrayBuffer[String] = new ArrayBuffer[String]()
-    for( flag <- _joinTable.indices) {
+    for (flag <- _joinTable.indices) {
       val joinTable = _joinTable(flag).get
       val cla = _on(flag).toFilterNode.toFragment
       joinClause += s"${joinTable} on ${cla}"
     }
 
-    val columns = _leftColumns match {
-      case Some(_) => _rightColumns :+ _leftColumns
+    val columns: ArrayBuffer[Option[String]] = _leftColumns match {
+      case Some(_) => {
+        _rightColumns.insert(0, _leftColumns)
+        _rightColumns
+      }
       case None => _rightColumns
     }
+
     if (columns.isEmpty) {
       throw new RuntimeException("Join must select columns by calling `leftColumns()` or `rightColumns`!")
     }
 
-    s"""select ${columns.map(col=>col.get).mkString(",")}
-    |from ${_from}
-    |${joinClause.mkString("\n")}
-    |as ${_tableName};""".stripMargin
+    s"""select ${columns.map(col => col.get).mkString(",")}
+       |from ${_from}
+       |${joinClause.mkString("\n")}
+       |as ${_tableName};""".stripMargin
   }
 
 

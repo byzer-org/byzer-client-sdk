@@ -188,6 +188,30 @@ class ByzerScriptTest extends AnyFunSuite {
     assert(expected == genCode, "Expect right column could be empty.")
   }
 
+  test("join-both-columns-empty") {
+    val byzer = Byzer()
+    val table1 = byzer.load.format("csv").path("/tmp/jack").options().add("header", "true").end
+    val table2 = byzer.load.format("csv").path("/tmp/william").options().add("header", "true").end
+    table1.namedTableName("table1").end
+    table2.namedTableName("table2").end
+
+    val t1 = table1.tableName
+    val t2 = table2.tableName
+
+
+    val caught =
+      intercept[RuntimeException] {
+        byzer.join.
+          from(Expr(Some(t1))).
+          left(Expr(Some(t2))).
+          on_and.add(Expr(Some(s"""${t1}.a=${t2}.b"""))).add(Expr(Some(s"""${t1}.a=${t2}.c"""))).end.
+          namedTableName("outputTable").
+          end.toScript
+      }
+
+    assert(caught.getMessage == "Join must select columns by calling `leftColumns()` or `rightColumns`!")
+  }
+
   test("join-serder") {
     val byzer = Byzer()
     val table1 = byzer.load.format("csv").path("/tmp/jack").options().add("header", "true").end
