@@ -79,6 +79,9 @@ class Commands(byzer: Byzer) {
   }
   
   def schema = {
+    if (byzer.blocks.isEmpty)
+      throw new RuntimeException("Byzer SQL block list is empty!")
+
     val tableName = byzer.lastTableName
     try {
       byzer.raw.code(s"!desc ${tableName};").end
@@ -277,7 +280,12 @@ class Byzer {
   }
 
   def lastTableName = {
-    blocks.last.tableName
+    val tableName: String = if (blocks.isEmpty){
+      ""
+    } else {
+      blocks.last.tableName
+    }
+    tableName
   }
 
 }
