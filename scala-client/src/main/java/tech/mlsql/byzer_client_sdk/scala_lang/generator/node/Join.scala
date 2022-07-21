@@ -221,6 +221,10 @@ class Join(parent: Byzer) extends BaseNode {
       case Some(_) => _rightColumns :+ _leftColumns
       case None => _rightColumns
     }
+    if (columns.isEmpty) {
+      throw new RuntimeException("Join must select columns by calling `leftColumns()` or `rightColumns`!")
+    }
+
     s"""select ${columns.map(col=>col.get).mkString(",")}
     |from ${_from}
     |${joinClause.mkString("\n")}
