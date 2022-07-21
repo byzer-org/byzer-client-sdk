@@ -186,7 +186,6 @@ class ByzerScriptTest extends AnyFunSuite {
                      |LEFT OUTER JOIN table2 on (table1.a=table2.b and table1.a=table2.c)
                      |as outputTable;""".stripMargin
     assert(expected == genCode, "Expect right column could be empty.")
-    println(genCode)
   }
 
   test("join-serder") {
