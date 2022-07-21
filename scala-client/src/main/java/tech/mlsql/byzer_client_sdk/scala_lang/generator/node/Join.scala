@@ -5,7 +5,6 @@ import tech.mlsql.byzer_client_sdk.scala_lang.generator._
 import tech.mlsql.common.utils.serder.json.JSONTool
 
 import java.util.UUID
-import scala.+:
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 

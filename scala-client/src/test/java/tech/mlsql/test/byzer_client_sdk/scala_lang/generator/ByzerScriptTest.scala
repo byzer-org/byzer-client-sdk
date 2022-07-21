@@ -2,7 +2,7 @@ package tech.mlsql.test.byzer_client_sdk.scala_lang.generator
 
 import org.scalatest.funsuite.AnyFunSuite
 import tech.mlsql.byzer_client_sdk.scala_lang.generator._
-import tech.mlsql.byzer_client_sdk.scala_lang.generator.node.{Columns, Filter, JoinMeta}
+import tech.mlsql.byzer_client_sdk.scala_lang.generator.node.{Columns, Filter}
 import tech.mlsql.common.utils.serder.json.JSONTool
 
 /**
