@@ -162,6 +162,33 @@ class ByzerScriptTest extends AnyFunSuite {
   }
 
 
+  test("join-right-columns-empty") {
+    val byzer = Byzer()
+    val table1 = byzer.load.format("csv").path("/tmp/jack").options().add("header", "true").end
+    val table2 = byzer.load.format("csv").path("/tmp/william").options().add("header", "true").end
+    table1.namedTableName("table1").end
+    table2.namedTableName("table2").end
+
+    val t1 = table1.tableName
+    val t2 = table2.tableName
+
+    val genCode = byzer.join.
+      from(Expr(Some(t1))).
+      left(Expr(Some(t2))).
+      on_and.add(Expr(Some(s"""${t1}.a=${t2}.b"""))).add(Expr(Some(s"""${t1}.a=${t2}.c"""))).end.
+      leftColumns(Expr(Some(s"${t1}.a,${t1}.c"))).
+      namedTableName("outputTable").
+      end.toScript
+    val expected = """load csv.`/tmp/jack` where `header`='''true''' as table1;
+                     |load csv.`/tmp/william` where `header`='''true''' as table2;
+                     |select table1.a,table1.c
+                     |from table1
+                     |LEFT OUTER JOIN table2 on (table1.a=table2.b and table1.a=table2.c)
+                     |as outputTable;""".stripMargin
+    assert(expected == genCode, "Expect right column could be empty.")
+    println(genCode)
+  }
+
   test("join-serder") {
     val byzer = Byzer()
     val table1 = byzer.load.format("csv").path("/tmp/jack").options().add("header", "true").end

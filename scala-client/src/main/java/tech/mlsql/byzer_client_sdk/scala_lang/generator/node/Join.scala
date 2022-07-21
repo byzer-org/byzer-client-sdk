@@ -5,7 +5,7 @@ import tech.mlsql.byzer_client_sdk.scala_lang.generator._
 import tech.mlsql.common.utils.serder.json.JSONTool
 
 import java.util.UUID
-import scala.::
+import scala.+:
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
@@ -217,7 +217,11 @@ class Join(parent: Byzer) extends BaseNode {
       joinClause += s"${joinTable} on ${cla}"
     }
 
-    s"""select ${_leftColumns.get},${_rightColumns.map(col=>col.get).mkString(",")}
+    val columns = _leftColumns match {
+      case Some(_) => _rightColumns :+ _leftColumns
+      case None => _rightColumns
+    }
+    s"""select ${columns.map(col=>col.get).mkString(",")}
     |from ${_from}
     |${joinClause.mkString("\n")}
     |as ${_tableName};""".stripMargin
