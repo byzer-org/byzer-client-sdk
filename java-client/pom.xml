@@ -6,7 +6,7 @@
 
     <groupId>tech.mlsql.byzer-client-sdk</groupId>
     <artifactId>java-client</artifactId>
-    <version>0.0.3</version>
+    <version>0.0.4</version>
 
     <name>Byzer client sdk</name>
     <url>https://github.com/allwefantasy/byzer-client-sdk</url>
@@ -67,7 +67,7 @@
         <dependency>
             <groupId>tech.mlsql.byzer-client-sdk</groupId>
             <artifactId>scala-client_${scala.binary.version}</artifactId>
-            <version>0.0.3</version>
+            <version>0.0.4</version>
         </dependency>
 
         <dependency>

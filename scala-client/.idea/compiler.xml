@@ -17,11 +17,13 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="scala-client_2.12" />
+        <module name="scala-client" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="scala-client" options="-g" />
       <module name="scala-client_2.12" options="-g" />
     </option>
   </component>
